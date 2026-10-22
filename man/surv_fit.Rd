@@ -43,7 +43,7 @@ A `survlearning_fit` object with engine, parameters, design, and
   the engine's reported convergence, not a universal convergence certificate.
   Kaplan-Meier accepts fully censored training outcomes and returns survival
   one within observed support; regression engines require an observed failure.
-  Invalid inputs or unavailable optional engines cause informative errors.
+  Invalid inputs or unavailable required dependencies cause informative errors.
   No files are written and no dependencies are installed automatically.
 }
 \description{
@@ -121,7 +121,7 @@ aligned splits. See [surv_parameters()] for inspectable defaults.
 `decay` (0.0001), `ties` (`"efron"`, also `"breslow"`), and `max_weights`
 (100000). It uses native R matrix operations and analytic backpropagation,
 with full-batch Adam and L2 penalty decay/2 times the squared weight norm.
-No Torch, Python, external runtime or optional neural engine is needed.
+No Torch, Python, external runtime or separate neural engine is needed.
 All observations at an event time enter the risk set before removing deaths
 or censorings; only event mass enters the Efron correction. The baseline
 uses the same ties method as training. `threads` must remain 1; this setting

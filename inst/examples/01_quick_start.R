@@ -1,5 +1,5 @@
-# Sequential quick start. Install survlearning locally first.
-# install.packages(".", repos = NULL, type = "source")
+# Sequential quick start. Install survlearning and its dependencies first.
+# See the README for repository and local-archive installation commands.
 # One row per unit. event = 1 is a failure; event = 0 is right censoring.
 library(survlearning)
 set.seed(2026)
@@ -39,10 +39,8 @@ surv_predict(tuned, new_unit, "risk")
 surv_predict(tuned, new_unit, "time") # Conditional AFT median, not an exact failure date.
 1 - surv_predict(tuned, new_unit, "survival", times = c(30, 90))
 
-# 4. Optional engines are installed only when needed.
-# install.packages("randomForestSRC")
-# forest <- surv_fit(f, train, "rsf", list(trees = 100, min_node = 10))
-# surv_score(forest, test)
-# install.packages("clarabel")
-# svm <- surv_fit(f, train, "svm") # Default compact linear Clarabel.
-# surv_predict(svm, new_unit)      # Risk only, not a probability.
+# 4. Forest and SVM engines are available after package installation.
+forest <- surv_fit(f, train, "rsf", list(trees = 100, min_node = 10))
+surv_score(forest, test)
+svm <- surv_fit(f, train, "svm") # Default compact linear Clarabel.
+surv_predict(svm, new_unit)      # Risk only, not a probability.

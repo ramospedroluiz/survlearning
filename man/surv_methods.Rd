@@ -10,13 +10,14 @@ surv_methods()
 A data frame with one row per supported method.
 }
 \description{
-List engines, prediction capabilities, and optional dependency availability.
+List engines, prediction capabilities, and installed dependency availability.
 A risk score always increases with risk; it is not a failure probability.
 Penalized AFT methods use the semiparametric Gehan estimator, not a
 penalized parametric likelihood.
 The `installed` column describes the default configuration. Native SVM
 kernels need no external SVM engine, but the default solver needs Clarabel;
 the explicit Newton solver is available without it.
+All supported engine and solver packages are required installation dependencies.
 }
 \examples{
 surv_methods()

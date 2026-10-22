@@ -1,6 +1,6 @@
 .new_engine_skip <- function(method) {
   package <- survlearning:::.reference_specs()[[method]]$engine
-  skip_if_not(requireNamespace(package, quietly = TRUE), paste("Missing optional engine", package))
+  expect_true(requireNamespace(package, quietly = TRUE), info = package)
 }
 
 .new_engine_params <- function(method) {
@@ -325,7 +325,7 @@ test_that("new covariate engines retain single-predictor and single-row dimensio
   data <- example_data(100L)
   for (method in setdiff(names(survlearning:::.reference_specs()), "km")) {
     package <- survlearning:::.reference_specs()[[method]]$engine
-    if (!requireNamespace(package, quietly = TRUE)) next
+    expect_true(requireNamespace(package, quietly = TRUE), info = package)
     fit <- surv_fit(survival::Surv(time, event) ~ x, data, method,
       .new_engine_params(method), seed = 8L)
     new <- data[1L, "x", drop = FALSE]

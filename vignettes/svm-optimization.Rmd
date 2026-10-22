@@ -11,7 +11,7 @@ vignette: >
 
 `method = "svm"` fits a censored **regression** SVM to all training rows.
 Its objective differs from ranking SVM and ordinary regression on observed times.
-The default is compact `solver = "clarabel"`, an optional R dependency.
+The default is compact `solver = "clarabel"`, a required R dependency.
 There is no silent dense fallback. Explicit `solver = "quadprog"` retains
 the dense reference numerical path. Explicit
 `solver = "osqp"`, `solver = "clarabel"` or `solver = "newton"` uses compact
@@ -27,9 +27,10 @@ Both kernels are implemented internally. Fitting, tuning
 and prediction do not require `survivalsvm` or `pracma`. `survivalsvm` is retained
 only for optional independent reference tests. The dense path calls
 `quadprog::solve.QP` directly, with the same objective signs and constraint order
-as the reference implementation. Linear Newton uses only mandatory package dependencies;
-the default needs `clarabel`, OSQP needs `osqp`, the dense reference needs
-`quadprog`, and compact additive fits additionally need `RSpectra`.
+as the reference implementation. Linear Newton uses base R optimization;
+the default uses `clarabel`, OSQP uses `osqp`, the dense reference uses
+`quadprog`, and compact additive fits additionally use `RSpectra`.
+All of these solver packages are installed as required dependencies.
 The dense solver provides a numerical reference. It can return an
 infeasible iterate on ill-conditioned linear problems. Non-finite or infeasible
 solutions cause an error before a model is returned.

@@ -1,5 +1,4 @@
 test_that("compact linear Hessian matches the reference nearPD, not another loss", {
-  skip_if_not_installed("Matrix")
   for (seed in 1:5) {
     set.seed(seed)
     x <- scale(matrix(rnorm(72), 24, 3))
@@ -18,7 +17,6 @@ test_that("compact linear Hessian matches the reference nearPD, not another loss
 
 test_that("dense reference predictions agree only when the solution is feasible", {
   skip_if_not_installed("survivalsvm")
-  skip_if_not_installed("quadprog")
   d <- example_data(28L)
   f <- survival::Surv(time, event) ~ x + z
   for (kernel in c("linear", "additive")) {
@@ -52,7 +50,6 @@ test_that("dense reference predictions agree only when the solution is feasible"
 })
 
 test_that("invalid dense solutions stop before a fitted model can be constructed", {
-  skip_if_not_installed("quadprog")
   problem <- list(x = matrix(c(0, 1), 2L),
     y = cbind(time = c(1, 2), event = c(1, 1)), h = diag(4L))
   params <- list(solver = "quadprog", cost = .1, tolerance = 1e-8)
@@ -84,8 +81,6 @@ test_that("saved infeasible engines cannot be used for prediction", {
 })
 
 test_that("compact solvers solve the same QP and report valid constraints", {
-  skip_if_not_installed("osqp", minimum_version = "1.0.0")
-  skip_if_not_installed("clarabel", minimum_version = "0.11.3")
   set.seed(19)
   d <- data.frame(time = runif(24, 1, 4), event = rep(c(0, 1), 12),
     x = rnorm(24), z = rnorm(24))
@@ -109,7 +104,6 @@ test_that("compact solvers solve the same QP and report valid constraints", {
 })
 
 test_that("SVM caching is split-local, bounded, and agrees with cold tuning", {
-  skip_if_not_installed("clarabel", minimum_version = "0.11.3")
   d <- example_data(50L)
   d$x[c(1, 3, 8)] <- NA
   f <- survival::Surv(time, event) ~ x + z

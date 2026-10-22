@@ -7,13 +7,13 @@ reproducible example and the output of `sessionInfo()`.
 ## Add an engine, not a new user interface
 
 1. Add a declarative specification to `.reference_specs()` or the existing
-   `.method_specs()`: identifier, description, optional engine, native prediction
+   `.method_specs()`: identifier, description, engine, native prediction
    capabilities and named defaults. Keep existing identifiers compatible.
 2. Validate every parameter, including categorical values and boundary cases.
    Accept the common formula design. Learn any scaling, knots and time grid on
    training rows only. Never discard censored rows or silently subsample.
 3. Implement fitting and prediction helpers, dispatched from the existing
-   reference registry. Optional engines must be loaded explicitly when restoring
+   reference registry. Engine namespaces must be loaded when restoring
    saved objects. Fit and prediction must not modify global options or RNG state.
 4. Define the increasing-risk convention. If a method predicts distributions,
    declare its time origin, support and extrapolation assumptions. An absolute
@@ -24,17 +24,19 @@ reproducible example and the output of `sessionInfo()`.
    S(0)=1, monotonicity, finite risk, saved-object prediction in a fresh session,
    reproducible seeds, unseen factors, missing values and fold-only preprocessing.
 7. Add a small example, parameter documentation, NEWS entry and benchmark case.
-   Optional-engine tests should skip only when that dependency/runtime is absent,
-   not when an installed engine fails. Do not mark warnings as successful convergence.
+   Declare every runtime engine and solver in `Imports`. Missing required
+   dependencies must fail installation checks, not skip method tests. Independent
+   reference packages and development tools may remain in `Suggests`.
+   Do not mark warnings as successful convergence.
 
 ## Check before review
 
 Run `testthat::test_local()` from the repository root, then `R CMD build .`
-and `R CMD check --as-cran survlearning_0.2.5.tar.gz` from a terminal.
-Optional-engine tests require their corresponding packages. Slow experiments
-belong outside mandatory examples and tests.
-Core functionality must work without torch, Python, downloads or every forest
-engine installed. Heavy runtimes are installed only by explicit user action.
+and `R CMD check --as-cran survlearning_0.2.6.tar.gz` from a terminal.
+Slow experiments belong outside mandatory examples and tests. All supported
+methods must work after a standard dependency-resolving installation. Fitting
+and prediction must not install packages or download data. Do not introduce
+Torch, Python, or a separately installed neural runtime.
 
 Grouped and temporal data require structurally matching inner/outer validation.
 No contribution may silently reuse a final test set for tuning or early stopping.

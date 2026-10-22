@@ -11,7 +11,7 @@ Pedro Luiz Ramos, Pontificia Universidad Catolica de Chile.
 - [Replication material](Replication_survlearning.zip): R scripts, baseline
   data, results, and the software version used in the numerical study.
 
-The interface described in the article is version 0.2.5. The numerical study
+The interface described in the article is version 0.2.6. The numerical study
 uses the supplied version 0.2.4; its software requirements and execution
 instructions are in `README_REPLICATION.md` inside the replication archive.
 The compatibility comparison reported in the article uses the same fitted

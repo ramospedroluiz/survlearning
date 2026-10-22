@@ -87,7 +87,6 @@ test_that("IPCW calibration agrees with explicit normalized case-control weights
 })
 
 test_that("the public default SVM is compact without observation removal", {
-  skip_if_not_installed("clarabel", minimum_version = "0.11.3")
   expect_identical(surv_parameters("svm")$solver, "clarabel")
   d <- example_data(3000)
   model <- surv_fit(Surv(time, event) ~ x + z, d, "svm")

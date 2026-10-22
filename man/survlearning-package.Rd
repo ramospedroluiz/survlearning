@@ -6,10 +6,18 @@
 \alias{survlearning-package}
 \title{Unified Statistical Learning for Survival and Reliability}
 \description{
-A formula-based interface to optional survival model engines, reusable
+A formula-based interface to integrated survival model engines, reusable
 validation, native predictions and censoring-aware evaluation. Start with
 [surv_methods()], [surv_fit()], [surv_tune()], [surv_predict()],
 [surv_score()], [surv_evaluate()] and [surv_validate()].
+}
+\seealso{
+Useful links:
+\itemize{
+  \item \url{https://github.com/ramospedroluiz/survlearning}
+  \item Report bugs at \url{https://github.com/ramospedroluiz/survlearning/issues}
+}
+
 }
 \author{
 \strong{Maintainer}: Pedro Luiz Ramos \email{pedro.ramos@uc.cl}

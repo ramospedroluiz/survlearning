@@ -3,7 +3,6 @@ test_that("elastic net reproduces the LASSO and ridge endpoints", {
   formula <- Surv(time, event) ~ x + z
   for (family in c("cox", "aft")) {
     engine <- if (family == "cox") "glmnet" else "penAFT"
-    skip_if_not_installed(engine)
     for (alpha in c(0, 1)) {
       endpoint <- paste0(family, if (alpha == 1) "_lasso" else "_ridge")
       method <- paste0(family, "_elasticnet")
@@ -25,7 +24,6 @@ test_that("elastic net reproduces the LASSO and ridge endpoints", {
 })
 
 test_that("XGBoost Cox uses censored labels and a training-only Breslow baseline", {
-  skip_if_not_installed("xgboost", minimum_version = "3.0.0")
   data <- example_data()
   data$time <- pmax(0.5, round(data$time))  # Exercise tied events and censoring.
   fit <- surv_fit(Surv(time, event) ~ x + z, data, "xgboost_cox",
@@ -50,7 +48,6 @@ test_that("XGBoost Cox uses censored labels and a training-only Breslow baseline
 })
 
 test_that("all XGBoost AFT errors give coherent curves and conditional medians", {
-  skip_if_not_installed("xgboost", minimum_version = "3.0.0")
   data <- example_data()
   formula <- Surv(time, event) ~ x + z
   for (distribution in c("normal", "logistic", "extreme")) {
@@ -79,7 +76,6 @@ test_that("all XGBoost AFT errors give coherent curves and conditional medians",
 })
 
 test_that("MTLR curves match native predictions, including a single new item", {
-  skip_if_not_installed("MTLR", minimum_version = "0.2.2")
   data <- example_data()
   fit <- surv_fit(Surv(time, event) ~ x + z, data, "mtlr", list(intervals = 5L))
   new <- data[1:2, c("x", "z")]
@@ -116,7 +112,6 @@ test_that("new priorities use common tuning, training-only transforms, and RNG c
   formula <- Surv(time, event) ~ x + z
   for (method in c("cox_elasticnet", "aft_elasticnet", "xgboost_cox", "xgboost_aft", "mtlr")) {
     engine <- survlearning:::.method_specs()[[method]]$engine
-    skip_if_not_installed(engine)
     params <- switch(method,
       aft_elasticnet = list(lambda = 0.01),
       xgboost_cox = , xgboost_aft = list(trees = 10L),

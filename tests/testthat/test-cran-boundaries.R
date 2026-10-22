@@ -15,7 +15,6 @@ test_that("Cox survival is defined at zero for extreme finite log-risk", {
 })
 
 test_that("penalized Cox also handles extreme finite log-risk", {
-  skip_if_not_installed("glmnet", "5.0")
   d <- example_data(100L)
   fit <- surv_fit(survival::Surv(time, event) ~ x + z, d, "cox_lasso")
   p <- surv_predict(fit, data.frame(x = c(1e8, -1e8), z = 0),

@@ -39,7 +39,18 @@ jobs:
         with:
           extra-packages: any::rcmdcheck
           needs: check
-      - uses: r-lib/actions/check-r-package@v2
-        with:
-          args: 'c("--no-manual", "--as-cran")'
-          error-on: '"warning"'
+      - name: Check published source archive
+        shell: Rscript {0}
+        env:
+          _R_CHECK_CRAN_INCOMING_: false
+          _R_CHECK_FORCE_SUGGESTS_: true
+        run: |
+          archive <- "artifacts/survlearning_0.2.6.tar.gz"
+          stopifnot(file.exists(archive))
+          print(tools::md5sum(archive))
+          rcmdcheck::rcmdcheck(path = archive,
+            args = c("--no-manual", "--as-cran"),
+            error_on = "warning", check_dir = "check")
+          tests <- "check/survlearning.Rcheck/tests/testthat.Rout"
+          stopifnot(file.exists(tests))
+          cat(readLines(tests), sep = "\n")

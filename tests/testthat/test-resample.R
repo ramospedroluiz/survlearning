@@ -256,7 +256,6 @@ test_that("available summaries and pair-specific intersections survive other met
 })
 
 test_that("real all-metric validation isolates risk-only probability failures", {
-  skip_if_not_installed("rpart")
   d <- example_data()
   f <- survival::Surv(time, event) ~ x + z
   p <- surv_resamples(f, d, folds = 2)

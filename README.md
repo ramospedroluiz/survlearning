@@ -15,11 +15,23 @@ install.packages("remotes")
 remotes::install_github("ramospedroluiz/survlearning", dependencies = NA)
 ```
 
-Only mandatory dependencies are installed by this command. The package uses
-`survival` and `withr` in addition to packages bundled with R. Install an optional
-engine only when you need its methods, for example `install.packages("ranger")`.
-No function downloads an engine automatically. Neural Cox fitting needs neither
+R 4.3.0 or later is required. This command installs all modeling engines and
+numerical solvers as required dependencies. After successful installation, all
+supported methods are available without additional package-installation steps.
+The initial download includes these dependencies and their own requirements;
+source installations may also require a compiler toolchain. Fitting functions
+do not install software or download data. Neural Cox fitting needs neither
 Torch nor Python. This version is available from GitHub, not CRAN.
+
+For a downloaded source archive, use an installer that resolves dependencies:
+
+```r
+remotes::install_local("survlearning_0.2.6.tar.gz", dependencies = NA)
+```
+
+Base R's `install.packages(..., repos = NULL)` installs a local archive but does
+not download its missing dependencies. Development tools and the `survivalsvm`
+reference implementation are suggested packages, not required for analysis.
 
 ## Fit and predict
 
@@ -134,7 +146,7 @@ horizon; quantiles not reached on the prediction grid are returned as `NA`.
 | `xgboost_cox` | xgboost | risk, survival |
 | `xgboost_aft` | xgboost | risk, median, survival |
 | `mtlr` | MTLR | risk, survival |
-| `svm` | native R; optional numerical solvers | risk |
+| `svm` | native R; Clarabel, OSQP, quadprog, or Newton | risk |
 | `flexsurv` | flexsurv | risk, survival |
 | `neural_cox` | native R | risk, survival |
 | `neural_discrete` | nnet | risk, survival |
@@ -144,8 +156,9 @@ statistical families. Penalized AFT uses Gehan loss. The `rpart` tree uses
 exponential deviance. Neural Cox retains proportional hazards and supports
 Efron and Breslow ties. Censored SVM uses linear or additive kernels and keeps
 the complete training sample. Its default compact solver is `clarabel`;
-linear `solver = "newton"` needs no optional solver, while compact additive
-fitting also needs `RSpectra`.
+linear `solver = "newton"` uses base R optimization, while compact additive
+fitting uses `RSpectra`. All supported solver packages are installed together
+with `survlearning`.
 
 ## Documentation
 
@@ -164,5 +177,5 @@ training follow-up; parametric extrapolation requires checking model assumptions
 Use `surv_diagnostics()` to inspect warnings and reported convergence status.
 
 Maintainer: Pedro Luiz Ramos, Pontificia Universidad Catolica de Chile.
-Original package code is licensed under GPL (>= 3). Optional engines retain
+Original package code is licensed under GPL (>= 3). External engines retain
 their authorship and licenses. Use `citation("survlearning")` for citation details.

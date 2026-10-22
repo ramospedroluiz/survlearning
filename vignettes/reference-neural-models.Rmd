@@ -34,8 +34,9 @@ spline bases are reused at prediction. Covariate splines do not remove PH.
 `coxboost` is componentwise likelihood boosting, distinct from gbm/XGBoost trees.
 `ranger` is an alternative forest engine; `aorsf` provides oblique forest splits.
 
-```{r optional, eval=FALSE}
-install.packages(c("flexsurv", "CoxBoost", "ranger", "aorsf"))
+All engines below are installed as dependencies of `survlearning`.
+
+```{r additional-engines, eval=FALSE}
 surv_fit(f, d, "flexsurv", list(knots = 1, scale = "hazard"))
 surv_fit(f, d, "coxboost", list(steps = 100, penalty = 100))
 surv_fit(f, d, "ranger", list(trees = 200))
@@ -109,14 +110,13 @@ are learned on training; endpoint probabilities are returned as a step function.
 Risk is negative restricted mean on that grid, not an extrapolated full mean.
 
 ```{r neural-discrete, eval=FALSE}
-install.packages("nnet")
 fit <- surv_fit(f, d, "neural_discrete",
   params = list(hidden = 8, intervals = 10, decay = 0.01, max_iter = 500))
 surv_predict(fit, d[1:2, ], "survival", times = c(30, 60, 90))
 surv_diagnostics(fit)
 ```
 
-Heavy engines are not needed for core models. Grids must be explicit and the
+No separate neural runtime is needed. Grids must be explicit and the
 final test must not choose training duration. Saved models are tested in fresh
 R sessions; live external pointers do not provide general serialization.
 

@@ -1,5 +1,4 @@
-test_that("restored fits load their optional engine before S3 prediction", {
-  skip_if_not_installed("glmnet", minimum_version = "5.0")
+test_that("restored fits load their engine before S3 prediction", {
   skip_if_not_installed("callr")
   data <- example_data()
   fit <- surv_fit(Surv(time, event) ~ x + z, data, "cox_lasso")

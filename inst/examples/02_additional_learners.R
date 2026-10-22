@@ -1,5 +1,5 @@
 # Elastic net, XGBoost and MTLR. Run sequentially after installing engines.
-# install.packages(c("glmnet", "penAFT", "xgboost", "MTLR"))
+# Modeling engines are installed with survlearning.
 library(survlearning)
 set.seed(2026)
 n <- 300

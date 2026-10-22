@@ -14,7 +14,7 @@ train <- d[1:400, ]
 test <- d[401:600, ]
 f <- Surv(time, event) ~ load + design
 
-# 2. Fit a model. No optional engine or neural runtime is needed for Cox.
+# 2. Fit a model using the engines installed with survlearning.
 fit <- surv_fit(f, train, method = "cox")
 surv_score(fit, test)
 

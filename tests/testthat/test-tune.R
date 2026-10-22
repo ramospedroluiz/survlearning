@@ -36,7 +36,6 @@ test_that("a model without tuning parameters uses the same validation interface"
 })
 
 test_that("fold-only standardization is used and test data is not needed", {
-  skip_if_not_installed("clarabel", minimum_version = "0.11.3")
   data <- example_data(36L)
   tuned <- surv_tune(survival::Surv(time, event) ~ x + z, data, "svm",
     list(cost = c(0.1, 0.2)), params = list(solver = "clarabel"), folds = 2, seed = 12)

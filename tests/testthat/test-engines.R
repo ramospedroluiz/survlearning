@@ -1,8 +1,7 @@
 for (id in c("aft_lasso", "aft_ridge", "cox_lasso", "cox_ridge", "tree", "rsf", "boosting", "svm")) {
   local({
     method <- id
-    test_that(paste("optional engine works:", method), {
-      skip_if_not_installed(survlearning:::.method_specs()[[method]]$engine)
+    test_that(paste("required engine works:", method), {
       data <- example_data()
       fit <- surv_fit(survival::Surv(time, event) ~ x + z, data,
         method, small_params(method), seed = 8)
@@ -42,7 +41,6 @@ for (id in c("aft_lasso", "aft_ridge", "cox_lasso", "cox_ridge", "tree", "rsf", 
 }
 
 test_that("penalized Cox also supports a single predictor", {
-  skip_if_not_installed("glmnet", minimum_version = "5.0")
   data <- example_data()
   for (method in c("cox_lasso", "cox_ridge")) {
     fit <- surv_fit(survival::Surv(time, event) ~ x, data, method)

@@ -25,8 +25,6 @@ test_that("fast additive prediction keeps support-specific ranges and extrapolat
 })
 
 test_that("additive compact Hessians retain the same nearPD spectral rule", {
-  skip_if_not_installed("RSpectra")
-  skip_if_not_installed("Matrix")
   for (seed in 1:4) {
     set.seed(seed)
     x <- cbind(rnorm(25), rep(c(0, 1, 2, 1, 0), 5))
@@ -43,8 +41,6 @@ test_that("additive compact Hessians retain the same nearPD spectral rule", {
 })
 
 test_that("matrix-free additive spectrum is complete above the reference cutoff", {
-  skip_if_not_installed("RSpectra")
-  skip_if_not_installed("Matrix")
   # More rows than the dense fallback, but few distinct covariate values.
   set.seed(91)
   x <- cbind(sample(0:5, 300, TRUE), sample(0:3, 300, TRUE))
@@ -61,8 +57,6 @@ test_that("matrix-free additive spectrum is complete above the reference cutoff"
 })
 
 test_that("additive solver, cache, and one-item prediction use the common interface", {
-  skip_if_not_installed("clarabel", minimum_version = "0.11.3")
-  skip_if_not_installed("RSpectra")
   d <- example_data(45)
   f <- Surv(time, event) ~ x + z
   args <- list(formula = f, data = d, method = "svm",
@@ -81,8 +75,6 @@ test_that("additive solver, cache, and one-item prediction use the common interf
 })
 
 test_that("identical-row multiplicities preserve the full corrected Hessian and QP", {
-  skip_if_not_installed("clarabel", minimum_version = "0.11.3")
-  skip_if_not_installed("RSpectra")
   set.seed(7)
   base <- data.frame(x = rnorm(8), z = rep(c(0, 1), 4),
     time = runif(8, 1, 4), event = rep(c(0, 1), 4))
@@ -123,7 +115,6 @@ test_that("identical-row multiplicities preserve the full corrected Hessian and 
 })
 
 test_that("weighted matrix-free operators include every replicate", {
-  skip_if_not_installed("RSpectra")
   set.seed(12)
   base <- data.frame(x = sample(0:5, 300, TRUE), z = sample(0:3, 300, TRUE),
     time = seq_len(300), event = rep(c(0, 1, 0), 100))
@@ -149,8 +140,6 @@ test_that("weighted matrix-free operators include every replicate", {
 })
 
 test_that("Newton solves the same additive QP and rejects an uncertified iterate", {
-  skip_if_not_installed("RSpectra")
-  skip_if_not_installed("clarabel", minimum_version = "0.11.3")
   d <- example_data(50)
   f <- Surv(time, event) ~ x + z
   for (kernel in c("linear", "additive")) {
@@ -198,7 +187,6 @@ test_that("Newton analytic derivatives match independent finite differences", {
 })
 
 test_that("an ambiguous spectral boundary is rejected rather than rounded to a rank", {
-  skip_if_not_installed("RSpectra")
   x <- cbind(seq_len(12), rep(c(0, 1), 6))
   delta <- rep(c(0, 1), 6)
   k <- survlearning:::.svm_kernel(x, "additive")
@@ -210,7 +198,6 @@ test_that("an ambiguous spectral boundary is rejected rather than rounded to a r
 })
 
 test_that("compact additive fits support one predictor and one new observation", {
-  skip_if_not_installed("RSpectra")
   d <- example_data(40)
   f <- Surv(time, event) ~ x
   fit <- surv_fit(f, d, "svm", list(kernel = "additive", solver = "newton"))

@@ -12,7 +12,7 @@ The explicit dense solver calls quadprog::solve.QP through its exported API.
 Its constraint order preserves the convention of the former pracma::quadprog
 wrapper (pracma, Hans W. Borchers, GPL >= 3); pracma is no longer a dependency.
 
-All other optional engine packages are called through their exported APIs.
+All other engine packages are called through their exported APIs.
 Their authors retain authorship and their respective licenses. They are not
 redistributed as embedded package sources or binaries. This wrapper does not
 claim authorship of the statistical methods implemented by these engines.

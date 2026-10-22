@@ -152,7 +152,6 @@ test_that("non-default calibration confidence agrees with an independent KM orac
 })
 
 test_that("the real XGBoost Cox engine retains native probabilities and serialization", {
-  skip_if_not_installed("xgboost", minimum_version = "3.0.0")
   d <- example_data(100)
   fit <- surv_fit(Surv(time, event) ~ x + z, d, "xgboost_cox",
     list(trees = 10L, depth = 1L), seed = 9)

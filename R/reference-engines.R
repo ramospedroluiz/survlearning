@@ -1,4 +1,4 @@
-# Optional engines are dispatched by membership in names(.reference_specs()).
+# Reference engines are dispatched by membership in names(.reference_specs()).
 .reference_specs <- function() {
   list(
     km = list(description = "Kaplan-Meier reference (no covariates)",

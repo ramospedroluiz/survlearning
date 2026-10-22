@@ -62,7 +62,6 @@ test_that("former native SVM objects predict using the internal kernel fallback"
   d <- example_data(35)
   f <- Surv(time, event) ~ x + z
   for (kernel in c("linear", "additive")) {
-    if (kernel == "additive") skip_if_not_installed("RSpectra")
     fit <- surv_fit(f, d, "svm", list(kernel = kernel, solver = "newton"), seed = 9)
     new <- d[1:3, ]
     new$x <- new$x + c(-4, 0, 4)

@@ -1,4 +1,4 @@
-# survlearning 0.2.5
+# survlearning 0.2.6
 
 Initial public version.
 
@@ -6,5 +6,6 @@ Initial public version.
 * Censoring-aware evaluation, calibration, and reusable validation plans.
 * Native neural Cox estimation and compact linear and additive censored SVM.
 * Predictive interpretation and conditional reliability summaries.
-* Optional modeling engines, parallel tuning, and resumable searches.
+* All supported modeling engines and solvers installed as required dependencies.
+* Parallel tuning and resumable searches.
 
