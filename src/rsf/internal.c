@@ -1,0 +1,630 @@
+/* Derived from randomForestSRC 3.9.0, Ishwaran and Kogalur.
+ * GPL (>= 3); see inst/COPYRIGHTS. Numerical core retained. */
+#include "global.h"
+/*
+#include "nativeInfo.h"
+NATXDInfo **SL_RF_natXDInfoList;
+NativeEnsembleInfo **SL_RF_nativeEnsembleInfoList;
+uint       SL_RF_natXDInfoListSize;
+uint       SL_RF_nativeEnsembleInfoListSize;
+PS_arrayXD *SL_RF_rLevelsPYTH;
+PS_arrayXD *SL_RF_xLevelsPYTH;
+*/
+/*
+JNIEnv    *SL_RF_java_env;
+jobject    SL_RF_java_obj;
+jclass     SL_RF_java_cls;
+jclass     SL_RF_java_except_cls;
+jclass     SL_RF_java_hshmap_cls;
+jmethodID  SL_RF_java_hshmap_constr;
+jmethodID  SL_RF_java_hshmap_put;
+jobject    SL_RF_java_hshmap_obj;
+jclass     SL_RF_java_ens_cls;
+jmethodID  SL_RF_java_ens_mid;
+jmethodID  SL_RF_java_mid_log;
+jmethodID  SL_RF_java_mid_logError;
+jmethodID  SL_RF_java_mid_logExit;
+NAT1DInfo **SL_RF_nat1DInfoList;
+NAT2DInfo **SL_RF_nat2DInfoList;
+NativeEnsembleInfo **SL_RF_nativeEnsembleInfoList;
+uint       SL_RF_nat1DInfoListSize;
+uint       SL_RF_nat2DInfoListSize;
+uint       SL_RF_nativeEnsembleInfoListSize;
+jobject    SL_RF_rLevelsJNIE;
+jobject    SL_RF_xLevelsJNIE;
+*/
+
+#include <Rinternals.h>
+#include "nativeInfo.h"
+SEXP SL_RF_sexpVector[2];
+SEXP      SL_RF_rLevelsSEXP;
+SEXP      SL_RF_xLevelsSEXP;
+
+#include "factor.h"
+#include "leafLink.h"
+#include "node.h"
+#include "terminal.h"
+#include "snpAuxiliaryInfo.h"
+#include "split.h"
+#include "quantile.h"
+#include "sortedLink.h"
+#include "sampling.h"
+SNPAuxiliaryInfo **SL_RF_snpAuxiliaryInfoList;
+SNPAuxiliaryInfo **SL_RF_incAuxiliaryInfoList;
+uint SL_RF_stackCount;
+uint SL_RF_nativeIndex;
+uint SL_RF_incStackCount;
+double   *SL_RF_cpuTime_;
+uint     *SL_RF_treeID_;
+uint     *SL_RF_nodeID_;
+uint     *SL_RF_nodeSZ_;
+uint     *SL_RF_blnodeID_;
+uint     *SL_RF_brnodeID_;
+int      **SL_RF_parmID_;
+double   **SL_RF_contPT_;
+uint     **SL_RF_mwcpSZ_;
+uint     **SL_RF_fsrecID_;
+uint     **SL_RF_mwcpPT_;
+uint   **SL_RF_mwcpCT_;
+ulong     SL_RF_totalNodeCount;
+ulong     SL_RF_totalTerminalCount;
+ulong     SL_RF_totalMWCPCount;
+ulong    *SL_RF_restoreTreeOffset;
+ulong   **SL_RF_restoreMWCPoffset;
+uint     *SL_RF_orderedTreeIndex;
+uint     *SL_RF_serialTreeIndex;
+uint      SL_RF_serialTreeID;
+uint      SL_RF_userTreeID;
+uint     *SL_RF_restoreTreeID;
+uint      SL_RF_perfBlockCount;
+uint      SL_RF_serialBlockID;
+double   *SL_RF_TN_SURV_;
+double   *SL_RF_TN_MORT_;
+double   *SL_RF_TN_NLSN_;
+double   *SL_RF_TN_CSHZ_;
+double   *SL_RF_TN_CIFN_;
+double   *SL_RF_TN_REGR_;
+uint     *SL_RF_TN_CLAS_;
+int      *SL_RF_seed_;
+int      *SL_RF_seedVimp_;
+uint     *SL_RF_optLoGrow_;
+uint      SL_RF_optLoGrow;
+uint     *SL_RF_tLeafCount_;
+uint     *SL_RF_tLeafCount;
+double   *SL_RF_imputation_;
+uint     *SL_RF_varUsed_;
+double   *SL_RF_splitDepth_;
+uint     *SL_RF_MEMB_ID_;
+uint     *SL_RF_BOOT_CT_;
+uint     *SL_RF_PRUN_ID_;
+uint     *SL_RF_CASE_DPTH_;
+uint     *SL_RF_RMBR_ID_;
+uint     *SL_RF_AMBR_ID_;
+uint     *SL_RF_OMBR_ID_;
+uint     *SL_RF_IMBR_ID_;
+uint     *SL_RF_TN_RCNT_;
+uint     *SL_RF_TN_ACNT_;
+uint     *SL_RF_TN_OCNT_;
+uint     *SL_RF_TN_ICNT_;
+uint     *SL_RF_OOB_SZ_;
+uint     *SL_RF_IBG_SZ_;
+double   *SL_RF_perfMRT_;
+double   *SL_RF_perfCLS_;
+double   *SL_RF_perfRGR_;
+double   *SL_RF_holdMRT_;
+double   *SL_RF_holdCLS_;
+double   *SL_RF_holdRGR_;
+uint     *SL_RF_holdBLK_;
+double   *SL_RF_splitStatLOT_;
+double   *SL_RF_emprRSK_;
+double   *SL_RF_oobEmprRSK_;
+double   *SL_RF_vimpMRT_;
+double   *SL_RF_vimpCLS_;
+double   *SL_RF_vimpRGR_;
+double   *SL_RF_perfBlockMRT_;
+double   *SL_RF_perfBlockCLS_;
+double   *SL_RF_perfBlockRGR_;
+double   *SL_RF_partial_SURV_;
+double   *SL_RF_partial_CRSK_;
+double   *SL_RF_partial_CLAS_;
+double   *SL_RF_partial_REGR_;
+double   *SL_RF_oobEnsembleSRG_;
+double   *SL_RF_fullEnsembleSRG_;
+double   *SL_RF_oobEnsembleCIF_;
+double   *SL_RF_fullEnsembleCIF_;
+double   *SL_RF_oobEnsembleSRV_;
+double   *SL_RF_fullEnsembleSRV_;
+double   *SL_RF_oobEnsembleMRT_;
+double   *SL_RF_fullEnsembleMRT_;
+double   *SL_RF_oobEnsembleCLS_;
+double   *SL_RF_fullEnsembleCLS_;
+double   *SL_RF_cseNumCLS_;
+double   *SL_RF_csvNumCLS_;
+double   *SL_RF_oobEnsembleRGR_;
+double   *SL_RF_fullEnsembleRGR_;
+double   *SL_RF_cseNumRGR_;
+double   *SL_RF_csvNumRGR_;
+uint     *SL_RF_cseDen_;
+uint     *SL_RF_csvDen_;
+double   *SL_RF_oobEnsembleQNT_;
+double   *SL_RF_fullEnsembleQNT_;
+double     *SL_RF_proximity_;
+double     *SL_RF_distance_;
+double     *SL_RF_weight_;
+uint      SL_RF_opt;
+uint      SL_RF_optHigh;
+uint      SL_RF_optSup;
+uint      SL_RF_splitRule;
+uint      SL_RF_splitCustomIdx;
+uint      SL_RF_nsplit;
+uint      SL_RF_nImpute;
+uint      SL_RF_ntree;
+uint      SL_RF_nodeSize;
+int       SL_RF_nodeDepth;
+uint      SL_RF_crWeightSize;
+double   *SL_RF_crWeight;
+uint      SL_RF_perfBlock;
+uint      SL_RF_mtry;
+uint      SL_RF_vtry;
+uint    **SL_RF_vtryArray;
+uint      SL_RF_vtryMode;
+uint      SL_RF_vtryBlockSize;
+uint      SL_RF_subjSize;
+double   *SL_RF_subjWeight;
+uint      SL_RF_bootstrapSize;
+uint    **SL_RF_bootstrapIn;
+double   *SL_RF_xWeightStat;
+double   *SL_RF_yWeight;
+uint      SL_RF_xMarginalSize;
+uint     *SL_RF_xMarginal;
+uint     *SL_RF_xMarginalFlag;
+double   *SL_RF_xWeight;
+uint      SL_RF_ptnCount;
+int       SL_RF_numThreads;
+uint      SL_RF_observationSize;
+uint      SL_RF_ySize;
+uint      SL_RF_rTargetCount;
+uint      SL_RF_rTargetFactorCount;
+uint      SL_RF_rTargetNonFactorCount;
+uint     *SL_RF_rTarget;
+uint     *SL_RF_rTargetFactor;
+uint     *SL_RF_rTargetNonFactor;
+double  **SL_RF_responseIn;
+double  **SL_RF_observationIn;
+uint     *SL_RF_subjIn;
+uint      SL_RF_xSize;
+char     *SL_RF_xType;
+uint     *SL_RF_xLevelsMax;
+uint     *SL_RF_xLevelsCnt;
+uint    **SL_RF_xLevels;
+uint     *SL_RF_xtType;
+uint     *SL_RF_stType;
+char     *SL_RF_rType;
+uint     *SL_RF_rLevelsMax;
+uint     *SL_RF_rLevelsCnt;
+uint    **SL_RF_rLevels;
+uint      SL_RF_ytry;
+double    SL_RF_wibsTau;
+double   **SL_RF_qStarPlus;
+double    *SL_RF_unoWeight;
+double    SL_RF_vimpThreshold;
+uint      SL_RF_fobservationSize;
+uint      SL_RF_frSize;
+double  **SL_RF_fresponseIn;
+double  **SL_RF_fobservationIn;
+uint      SL_RF_timeIndex;
+uint      SL_RF_statusIndex;
+uint     *SL_RF_yIndex;
+uint      SL_RF_ySizeProxy;
+uint     *SL_RF_yIndexZero;
+uint      SL_RF_yIndexZeroSize;
+char     *SL_RF_testMembershipFlag;  
+uint      SL_RF_intrPredictorSize;
+uint     *SL_RF_intrPredictor;
+char     *SL_RF_importanceFlag;   
+uint      SL_RF_partialType;
+uint      SL_RF_partialXvar;
+uint      SL_RF_partialLength;
+double   *SL_RF_partialValue;
+uint      SL_RF_partialLength2;
+uint     *SL_RF_partialXvar2;
+double   *SL_RF_partialValue2;
+uint      SL_RF_partialTimeLength;
+double   *SL_RF_partialTime;
+double   *SL_RF_quantile;
+uint      SL_RF_quantileSize;
+double    SL_RF_qEpsilon;
+uint      SL_RF_inv_2qEpsilon;
+uint     *SL_RF_getTree;
+uint      SL_RF_xWeightType;
+uint     *SL_RF_xWeightSorted;
+uint      SL_RF_xWeightDensitySize;
+uint      SL_RF_yWeightType;
+uint     *SL_RF_yWeightSorted;
+uint      SL_RF_yWeightDensitySize;
+uint      SL_RF_subjWeightType;
+uint     *SL_RF_subjWeightSorted;
+uint      SL_RF_subjWeightDensitySize;
+uint      SL_RF_eventTypeSize;
+uint      SL_RF_feventTypeSize;
+uint      SL_RF_mStatusSize;
+uint     *SL_RF_eventType;
+uint     *SL_RF_eventTypeIndex;
+uint     *SL_RF_eIndividualSize;
+uint    **SL_RF_eIndividualIn;
+uint     *SL_RF_subjSlot;
+uint     *SL_RF_subjSlotCount;
+uint    **SL_RF_subjList;
+uint     *SL_RF_caseMap;
+uint      SL_RF_subjCount;
+uint      *SL_RF_classLevelSize;
+uint     **SL_RF_classLevel;
+uint     **SL_RF_classLevelIndex;
+uint    ***SL_RF_cIndividualIn;
+double   *SL_RF_timeInterest;
+uint      SL_RF_timeInterestSize;
+uint      SL_RF_sortedTimeInterestSize;
+double   *SL_RF_masterTime;
+uint      SL_RF_masterTimeSize;
+uint     *SL_RF_masterTimeIndexIn;
+uint     *SL_RF_masterToInterestTimeMap;
+double    SL_RF_wibsTauTime;
+uint      SL_RF_wibsTauTimeIdx;
+uint      SL_RF_rFactorCount;
+uint     *SL_RF_rFactorMap;
+uint     *SL_RF_rFactorIndex;
+uint     *SL_RF_rFactorSize;
+uint     *SL_RF_rFactorSizeTest;
+uint      SL_RF_mrFactorSize;
+uint      SL_RF_fmrFactorSize;
+uint     *SL_RF_mrFactorIndex;
+uint     *SL_RF_fmrFactorIndex;
+uint      SL_RF_rNonFactorCount;
+uint     *SL_RF_rNonFactorMap;
+uint     *SL_RF_rNonFactorIndex;
+uint      SL_RF_xFactorCount;
+uint     *SL_RF_xFactorMap;
+uint     *SL_RF_xFactorIndex;
+uint     *SL_RF_xFactorSize;
+uint      SL_RF_mxFactorSize;
+uint      SL_RF_fmxFactorSize;
+uint     *SL_RF_mxFactorIndex;
+uint     *SL_RF_fmxFactorIndex;
+uint      SL_RF_xNonFactorCount;
+uint     *SL_RF_xNonFactorMap;
+uint     *SL_RF_xNonFactorIndex;
+uint      SL_RF_rMaxFactorLevel;
+uint      SL_RF_xMaxFactorLevel;
+uint      SL_RF_maxFactorLevel;
+char      SL_RF_mStatusFlag;
+char      SL_RF_mTimeFlag;
+char      SL_RF_mResponseFlag;
+char      SL_RF_mPredictorFlag;
+char      SL_RF_fmStatusFlag;
+char      SL_RF_fmTimeFlag;
+char      SL_RF_fmResponseFlag;
+char      SL_RF_fmPredictorFlag;
+uint     *SL_RF_mRecordMap;
+uint     *SL_RF_fmRecordMap;
+uint      SL_RF_mRecordSize;
+uint      SL_RF_fmRecordSize;
+uint     *SL_RF_mRecordIndex;
+uint     *SL_RF_fmRecordIndex;
+uint      SL_RF_mpIndexSize;
+uint      SL_RF_fmpIndexSize;
+int     **SL_RF_mpSign;
+int     **SL_RF_fmpSign;
+int      *SL_RF_mpIndex;
+int      *SL_RF_fmpIndex;
+uint     *SL_RF_getTreeIndex;
+uint      SL_RF_getTreeCount;
+SplitRuleObj *SL_RF_splitRuleObj;
+double   **SL_RF_importancePtr;
+double **SL_RF_sImputeResponsePtr;
+double **SL_RF_sImputePredictorPtr;
+double **SL_RF_sImputeDataPtr;
+uint  **SL_RF_MEMB_ID_ptr;
+uint  **SL_RF_BOOT_CT_ptr;
+uint  **SL_RF_PRUN_ID_ptr;
+uint  **SL_RF_CASE_DPTH_ptr;
+uint     **SL_RF_treeID_ptr;
+uint     **SL_RF_nodeID_ptr;
+uint     **SL_RF_nodeSZ_ptr;
+uint     **SL_RF_blnodeID_ptr;
+uint     **SL_RF_brnodeID_ptr;
+int     ***SL_RF_parmID_ptr;
+double  ***SL_RF_contPT_ptr;
+uint    ***SL_RF_mwcpSZ_ptr;
+uint    ***SL_RF_fsrecID_ptr;
+uint    ***SL_RF_mwcpPT_ptr;
+uint     **SL_RF_mwcpCT_ptr;
+double   **SL_RF_spltST_ptr;
+uint     **SL_RF_dpthST_ptr;
+uint  **SL_RF_RMBR_ID_ptr;
+uint  **SL_RF_AMBR_ID_ptr;
+uint  **SL_RF_OMBR_ID_ptr;
+uint  **SL_RF_IMBR_ID_ptr;
+uint  **SL_RF_TN_RCNT_ptr;
+uint  **SL_RF_TN_ACNT_ptr;
+uint  **SL_RF_TN_OCNT_ptr;
+uint  **SL_RF_TN_ICNT_ptr;
+LeafLinkedObj **SL_RF_leafLinkedObjHead;
+LeafLinkedObj **SL_RF_leafLinkedObjTail;
+double **SL_RF_proximityPtr;
+double **SL_RF_proximityDenPtr;
+double  *SL_RF_proximityDen;
+double **SL_RF_distancePtr;
+double **SL_RF_distanceDenPtr;
+double  *SL_RF_distanceDen;
+uint    SL_RF_rejectedTreeCount;
+uint    SL_RF_validTreeCount;
+uint    SL_RF_stumpedTreeCount;
+double  ***SL_RF_TN_SURV_ptr;
+double  ***SL_RF_TN_MORT_ptr;
+double  ***SL_RF_TN_NLSN_ptr;
+double ****SL_RF_TN_CSHZ_ptr;
+double ****SL_RF_TN_CIFN_ptr;
+double  ***SL_RF_TN_REGR_ptr;
+uint   ****SL_RF_TN_CLAS_ptr;
+Terminal ****SL_RF_vimpMembership;
+Terminal ***SL_RF_partMembership;
+double  ***SL_RF_vimpMRTstd;
+double ****SL_RF_vimpCLSstd;
+double  ***SL_RF_vimpRGRstd;
+double   **SL_RF_vimpEnsembleDen;
+double   **SL_RF_perfMRTptr;
+double  ***SL_RF_perfCLSptr;
+double   **SL_RF_perfRGRptr;
+double   **SL_RF_cseNumCLSptr;
+double   **SL_RF_cseNumRGRptr;
+uint      *SL_RF_cseDENptr;
+double  ***SL_RF_csvNumCLSptr;
+double  ***SL_RF_csvNumRGRptr;
+uint     **SL_RF_csvDENptr;
+double   **SL_RF_blkEnsembleMRTnum;
+double  ***SL_RF_blkEnsembleCLSnum;
+double   **SL_RF_blkEnsembleRGRnum;
+double    *SL_RF_blkEnsembleDen;
+double  ***SL_RF_vimpMRTblk;
+double ****SL_RF_vimpCLSblk;
+double  ***SL_RF_vimpRGRblk;
+double   **SL_RF_perfMRTblk;
+double  ***SL_RF_perfCLSblk;
+double   **SL_RF_perfRGRblk;
+double   **SL_RF_vimpMRTptr;
+double  ***SL_RF_vimpCLSptr;
+double   **SL_RF_vimpRGRptr;
+double  ***SL_RF_holdMRTptr;
+double ****SL_RF_holdCLSptr;
+double  ***SL_RF_holdRGRptr;
+double  ****SL_RF_holdMRTstd;
+double *****SL_RF_holdCLSstd;
+double  ****SL_RF_holdRGRstd;
+double   ***SL_RF_holdEnsembleDen;
+uint **SL_RF_holdoutMap;
+uint *SL_RF_holdBLKptr;
+uint **SL_RF_runningHoldoutCount;
+uint ***SL_RF_blockSerialTreeIndex;
+double   **SL_RF_splitStatLOTptr;
+double   **SL_RF_emprRSKptr;
+double   **SL_RF_oobEmprRSKptr;
+double  ****SL_RF_partSURVptr;
+double  ****SL_RF_partCLASptr;
+double   ***SL_RF_partREGRptr;
+double ***SL_RF_oobEnsembleSRGptr;
+double ***SL_RF_fullEnsembleSRGptr;
+double ***SL_RF_oobEnsembleCIFptr;
+double ***SL_RF_fullEnsembleCIFptr;
+double  **SL_RF_oobEnsembleSRVptr;
+double  **SL_RF_fullEnsembleSRVptr;
+double  **SL_RF_oobEnsembleMRTptr;
+double  **SL_RF_fullEnsembleMRTptr;
+double ***SL_RF_oobEnsembleCLSptr;
+double ***SL_RF_fullEnsembleCLSptr;
+double  **SL_RF_oobEnsembleRGRptr;
+double  **SL_RF_fullEnsembleRGRptr;
+double  ***SL_RF_oobEnsembleQNTptr;
+double  ***SL_RF_fullEnsembleQNTptr;
+uint    **SL_RF_oobQuantileStreamSize;
+uint    **SL_RF_fullQuantileStreamSize;
+LookUpInfo *** SL_RF_oobQuantileSearchTree;
+LookUpInfo *** SL_RF_fullQuantileSearchTree;
+QuantileObj ***SL_RF_oobQuantileHead;
+QuantileObj ***SL_RF_oobQuantileTail;
+uint         **SL_RF_oobQuantileLinkLength;
+QuantileObj ***SL_RF_fullQuantileHead;
+QuantileObj ***SL_RF_fullQuantileTail;
+uint         **SL_RF_fullQuantileLinkLength;
+double ***SL_RF_oobEnsembleSRGnum;
+double ***SL_RF_fullEnsembleSRGnum;
+double ***SL_RF_oobEnsembleCIFnum;
+double ***SL_RF_fullEnsembleCIFnum;
+double  **SL_RF_oobEnsembleSRVnum;
+double  **SL_RF_fullEnsembleSRVnum;
+double  **SL_RF_oobEnsembleMRTnum;
+double  **SL_RF_fullEnsembleMRTnum;
+double ***SL_RF_oobEnsembleCLSnum;
+double ***SL_RF_fullEnsembleCLSnum;
+double  **SL_RF_oobEnsembleRGRnum;
+double  **SL_RF_fullEnsembleRGRnum;
+double   *SL_RF_oobEnsembleDen;
+double   *SL_RF_fullEnsembleDen;
+double ***SL_RF_splitDepthPtr;
+double **SL_RF_weightPtr;
+uint    *SL_RF_weightDenom;
+char    **SL_RF_dmRecordBootFlag;
+uint   **SL_RF_varUsedPtr;
+uint    *SL_RF_oobSize;
+uint    *SL_RF_ibgSize;
+uint    *SL_RF_nodeCount;
+uint   **SL_RF_mwcpPtr;
+uint    *SL_RF_pLeafCount;
+uint    *SL_RF_maxDepth;
+Node    **SL_RF_root;
+Node   ***SL_RF_nodeMembership;  
+Node   ***SL_RF_fnodeMembership;
+Node   ***SL_RF_pNodeMembership;
+Node   ***SL_RF_pNodeList;
+Terminal   ***SL_RF_tTermMembership;
+Terminal   ***SL_RF_ftTermMembership;
+uint       ***SL_RF_utTermMembership;
+uint        **SL_RF_utTermMembershipCount;
+uint        **SL_RF_utTermMembershipAlloc;
+Terminal   ***SL_RF_pTermMembership;
+Terminal   ***SL_RF_tTermList;
+Terminal   ***SL_RF_pTermList;
+LeafLinkedObj ***SL_RF_hTermMembership;
+uint    **SL_RF_bootMembershipIndex;
+uint     *SL_RF_identityMembershipIndex;
+uint      SL_RF_identityMembershipIndexSize;
+uint     *SL_RF_fidentityMembershipIndex;
+char    **SL_RF_bootMembershipFlag;
+uint    **SL_RF_bootMembershipCount;
+char    **SL_RF_oobMembershipFlag;
+uint    **SL_RF_ibgMembershipIndex;
+uint    **SL_RF_oobMembershipIndex;
+double  **SL_RF_status;
+double  **SL_RF_time;
+double ***SL_RF_response;
+double  **SL_RF_ftime;
+double  **SL_RF_fstatus;
+double ***SL_RF_fresponse;
+double ***SL_RF_observation;
+double ***SL_RF_fobservation;
+uint    ***SL_RF_observationRank;
+uint     **SL_RF_observationUniqueSize;
+SortedLinkedObj **SL_RF_sortedLinkedHead;
+SortedLinkedObj **SL_RF_sortedLinkedTail;
+uint    **SL_RF_masterTimeIndex;
+Factor ***SL_RF_factorList;
+double   *SL_RF_rFactorThreshold;
+uint     *SL_RF_rFactorMinority;
+uint     *SL_RF_rFactorMajority;
+char     *SL_RF_rFactorMinorityFlag;
+void (*acquireTree) (char mode, uint r, uint b);
+Node *(*antiMembership) (uint     treeID,
+                         Node    *parent,
+                         uint     individual,
+                         uint     vimpX,
+                         double **xArray);
+Node *(*randomMembership) (uint     treeID,
+                           Node    *parent,
+                           uint     individual,
+                           uint     vimpX,
+                           double **xArray);
+Node *(*getMembership) (uint     treeID,
+                        Node    *parent,
+                        uint     individual,
+                        double **xArray);
+void (*partialMembership) (uint       treeID,
+                           Node      *parent,
+                           uint       partialIndex,
+                           uint      *allMembrIndx,
+                           uint       obsSize,
+                           double   **xArray,
+                           Terminal **membership);
+char (*getVariance) (uint, uint*, uint, uint*, double*, double*, double*);
+char (*growTree) (uint, char, char, uint, Node*, uint*, uint*, uint*);
+char (*getPreSplitResult) (uint, Node*, char, char);
+DistributionObj *(*stackRandomCovariates) (uint, Node*);
+void (*unstackRandomCovariates) (uint, DistributionObj*);
+char (*selectRandomCovariates) (uint, Node*, DistributionObj*, char*, uint*, uint*);
+DistributionObj *(*stackRandomResponses) (uint, Node*);
+void (*unstackRandomResponses) (uint, DistributionObj*);
+char (*selectRandomResponses) (uint, Node*, DistributionObj*, uint*, uint*);
+uint (*virtuallySplitNode) (uint, Node*, char, uint, double*, uint*, void*, uint, char*, uint*, uint, uint*);
+uint (*stackAndConstructSplitVector) (uint treeID, Node *parent, uint covariate);
+char (*updateMaximumSplit) (uint    treeID,
+                            Node   *parent,
+                            double  delta,
+                            uint    covariate,
+                            uint    index,
+                            char    factorFlag,
+                            uint    mwcpSizeAbsolute,
+                            uint    repMembrSize,
+                            char  **polarity,
+                            void   *splitVectorPtr,
+                            SplitInfoMax *splitInfoMax);
+char (*forkAndUpdate) (uint       treeID,
+                       Node      *parent,
+                       uint      *repMembrIndx,
+                       uint       repMembrSize,
+                       uint      *allMembrIndx,
+                       uint       allMembrSize,
+                       char       multImpFlag,
+                       SplitInfo *info,
+                       uint      *leafCount,
+                       Node     **nodeMembership);
+void (*freeNode) (Node *parent);
+void (*unstackSplitVector) (uint   treeID,
+                            Node  *parent,
+                            uint   splitLength,
+                            char   factorFlag,
+                            uint   splitVectorSize,
+                            uint   mwcpSizeAbsolute,
+                            char   deterministicSplitFlag,
+                            void  *splitVectorPtr,
+                            char   multImpFlag,
+                            uint  *indxx);
+char (*randomSplit) (uint, Node*, SplitInfoMax*, GreedyObj*, char);
+char (*regressionXwghtSplit) (uint, Node*, SplitInfoMax*, GreedyObj*, char);
+char (*classificationXwghtSplit) (uint, Node*, SplitInfoMax*, GreedyObj*, char);
+char (*multivariateSplit) (uint, Node*, SplitInfoMax*, GreedyObj*, char);
+char (*unsupervisedSplit) (uint, Node*, SplitInfoMax*, GreedyObj*, char);
+void (*getConditionalClassificationIndex) (uint,
+                                           uint,
+                                           double*,
+                                           double**,
+                                           double*,
+                                           double*,
+                                           double*);
+double (*getGMeanIndex) (uint,
+                         uint,
+                         double*,
+                         double*,
+                         double*);
+float (*ran1A) (uint);
+void  (*randomSetChain) (uint, int);
+int   (*randomGetChain) (uint);
+float (*ran1B) (uint);
+void  (*randomSetUChain) (uint, int);
+int   (*randomGetUChain) (uint);
+void  (*randomSetUChainVimp) (uint, int);
+int   (*randomGetUChainVimp) (uint);
+float (*ran1D) (uint);
+void  (*randomSetChainVimp) (uint, int);
+int   (*randomGetChainVimp) (uint);
+uint SL_RF_forestChunkSize;
+uint SL_RF_forestChunkCount;
+uint *SL_RF_forestChunkSizeActual;
+uint **SL_RF_forestChunk;
+#ifdef _OPENMP
+omp_lock_t   *SL_RF_lockPartial;
+omp_lock_t  **SL_RF_lockWeight;
+omp_lock_t   *SL_RF_lockWeightRow;
+omp_lock_t  **SL_RF_lockVimp;
+omp_lock_t   *SL_RF_lockVimpRow;
+omp_lock_t   *SL_RF_lockVimpCol;
+omp_lock_t  **SL_RF_lockVimpHoldout;
+omp_lock_t  **SL_RF_lockMRToens;
+omp_lock_t  **SL_RF_lockMRTfens;
+omp_lock_t  **SL_RF_lockSRVoens;
+omp_lock_t  **SL_RF_lockSRVfens;
+omp_lock_t ***SL_RF_lockSRGoens;
+omp_lock_t ***SL_RF_lockSRGfens;
+omp_lock_t ***SL_RF_lockCIFoens;
+omp_lock_t ***SL_RF_lockCIFfens;
+omp_lock_t ***SL_RF_lockCLSoens;
+omp_lock_t ***SL_RF_lockCLSfens;
+omp_lock_t   *SL_RF_lockDENoens;
+omp_lock_t   *SL_RF_lockDENfens;
+omp_lock_t   *SL_RF_lockQNToens;
+omp_lock_t   *SL_RF_lockQNTfens;
+omp_lock_t      SL_RF_lockPerf;
+omp_lock_t      SL_RF_lockEnsbUpdtCount;
+#endif
+uint SL_RF_ensbUpdtCount;
+customFunction customFunctionArray[4][16];
+uint   SL_RF_userTraceFlag;
+time_t SL_RF_userTimeStart;
+time_t SL_RF_userTimeSplit;  

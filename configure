@@ -1,0 +1,51 @@
+#!/bin/sh
+# OpenMP is used only by the C forest core. Verify linking through C++17.
+set -eu
+R="${R_HOME}/bin/R"
+tmp=$(mktemp -d ./conftest-survlearning-XXXXXX)
+trap 'rm -rf "$tmp"' EXIT HUP INT TERM
+enabled=no
+omp_c=
+omp_link=
+if test "${SURVLEARNING_OPENMP:-auto}" != no; then
+  cat > "$tmp/probe.c" <<'EOF'
+#include <omp.h>
+#ifndef _OPENMP
+#error OpenMP is not enabled
+#endif
+int forest_threads(void) {
+  int total = 0;
+  #pragma omp parallel reduction(+:total)
+  total += omp_get_thread_num() + 1;
+  return total;
+}
+EOF
+  cat > "$tmp/probe.cpp" <<'EOF'
+extern "C" int forest_threads(void);
+extern "C" int probe_threads(void) { return forest_threads(); }
+EOF
+  mv "$tmp/probe.c" "$tmp/forest.c"
+  cat > "$tmp/Makevars" <<'EOF'
+CXX_STD = CXX17
+PKG_CFLAGS = $(SHLIB_OPENMP_CFLAGS)
+PKG_LIBS = $(SHLIB_OPENMP_CXXFLAGS)
+all: $(SHLIB) flags
+.PHONY: flags
+flags:
+	@echo '$(SHLIB_OPENMP_CFLAGS)' > cflags.txt
+	@echo '$(SHLIB_OPENMP_CXXFLAGS)' > linkflags.txt
+EOF
+  if (cd "$tmp" && "$R" CMD SHLIB forest.c probe.cpp -o probe.dll) > "$tmp/compile.log" 2>&1; then
+    if "$R" --vanilla --slave -e 'dyn.load(commandArgs(TRUE)[1], now = TRUE)' --args "$tmp/probe.dll" >> "$tmp/compile.log" 2>&1; then
+      enabled=yes
+      omp_c=$(cat "$tmp/cflags.txt")
+      omp_link=$(cat "$tmp/linkflags.txt")
+    fi
+  fi
+fi
+if test "$enabled" != yes; then
+  omp_c=
+  omp_link=
+fi
+echo "survlearning: compatible C OpenMP / C++17 link: $enabled"
+sed -e "s|@RSF_OPENMP_COMPILE@|$omp_c|g" -e "s|@RSF_OPENMP_LINK@|$omp_link|g" src/Makevars.in > src/Makevars

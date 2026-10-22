@@ -20,3 +20,5 @@
 ^GitHub_survlearning$
 ^paper$
 ^artifacts$
+^src/.*\.(o|dll|so|a)$
+^src/Makevars$

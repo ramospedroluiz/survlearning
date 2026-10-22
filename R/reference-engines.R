@@ -7,7 +7,7 @@
       engine = "survival", predictions = c("risk", "survival"),
       defaults = list(df = 3L)),
     flexsurv = list(description = "Royston-Parmar flexible parametric survival model",
-      engine = "flexsurv", predictions = c("risk", "survival"),
+      engine = "survlearning", predictions = c("risk", "survival"),
       defaults = list(knots = 1L, scale = "hazard")),
     coxboost = list(description = "Componentwise likelihood-based Cox boosting",
       engine = "CoxBoost", predictions = c("risk", "survival"),
@@ -77,8 +77,7 @@
       if (length(unique(y[y[, 2L] == 1, 1L])) < params$knots + 2L) {
         stop("Royston-Parmar requires at least knots + 2 distinct event times.", call. = FALSE)
       }
-      flexsurv::flexsurvspline(formula, data = data, k = params$knots,
-        scale = params$scale)
+      .fit_rp(x, y, params)
     },
     coxboost = {
       .integer_scalar(params$steps, "steps", 1L)
@@ -119,7 +118,7 @@
       km = rep(0, n),
       cox_spline = stats::predict(fit, newdata = new, type = "lp", reference = "zero"),
       flexsurv = {
-        beta <- stats::coef(fit)[colnames(x)]
+        beta <- .rp_coefficients(fit)[colnames(x)]
         drop(x %*% beta)
       },
       coxboost = stats::predict(fit, newdata = x, at.step = object$params$steps, type = "lp"),
@@ -143,9 +142,7 @@
       .ph_survival(lp, h)
     },
     flexsurv = {
-      pred <- summary(fit, newdata = new, type = "survival", t = requested,
-        ci = FALSE, se = FALSE, tidy = FALSE)
-      t(vapply(pred, function(row) row$est[match(requested, row$time)], numeric(length(requested))))
+      .rp_survival(fit, x, requested)
     },
     coxboost = {
       positive <- requested > 0

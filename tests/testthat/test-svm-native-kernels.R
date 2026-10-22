@@ -40,7 +40,7 @@ test_that("linear Newton fits, tunes and resumes through the native engine", {
   d <- example_data(50)
   f <- Surv(time, event) ~ x + z
   expect_identical(survlearning:::.method_specs()$svm$engine, "stats")
-  expect_identical(survlearning:::.method_specs()$rsf$engine, "randomForestSRC")
+  expect_identical(survlearning:::.method_specs()$rsf$engine, "survlearning")
   expect_identical(survlearning:::.method_specs()$ranger$engine, "ranger")
   fit <- surv_fit(f, d, "svm", params = list(solver = "newton"), seed = 17)
   expect_identical(fit$n, nrow(d))

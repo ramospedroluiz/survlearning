@@ -91,7 +91,7 @@ surv_predict <- function(object, newdata, type = "risk", times = NULL) {
   result <- switch(object$method,
     aft = -stats::predict(object$engine, newdata = .engine_data(x), type = "lp"),
     aft_lasso = , aft_ridge = , aft_elasticnet = {
-      beta <- as.numeric(penAFT::penAFT.coef(object$engine, lambda = object$params$lambda)$beta)
+      beta <- .gehan_coefficients(object$engine, object$params$lambda)
       -drop(x %*% beta)
     },
     cox = stats::predict(object$engine, newdata = .engine_data(x), type = "lp", reference = "zero"),
@@ -126,7 +126,7 @@ predict.survlearning_tune <- function(object, newdata, type = "risk", times = NU
 .rsf_prediction <- function(object, x) {
   old <- options(rf.cores = object$params$threads)
   on.exit(options(old), add = TRUE)
-  .with_seed(object$seed, stats::predict(object$engine, newdata = .engine_data(x)))
+  .with_seed(object$seed, .predict_rsf(object$engine, newdata = .engine_data(x)))
 }
 
 .survival_prediction <- function(object, x, times) {

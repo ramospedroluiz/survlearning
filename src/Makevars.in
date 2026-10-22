@@ -1,0 +1,24 @@
+PKG_CFLAGS = @RSF_OPENMP_COMPILE@ $(C_VISIBILITY)
+CXX_STD = CXX17
+PKG_CXXFLAGS = $(CXX_VISIBILITY)
+PKG_CPPFLAGS = -Irsf -Irsf/shared
+PKG_LIBS = @RSF_OPENMP_LINK@ $(LAPACK_LIBS) $(BLAS_LIBS) $(FLIBS)
+OBJECTS = init.o gehan.o \
+  rsf/bootstrap.o rsf/classification.o rsf/diagnostic.o \
+  rsf/entryGeneric.o rsf/factorOps.o rsf/importance.o rsf/importanceAnti.o \
+  rsf/importancePerm.o rsf/importanceRand.o rsf/impute.o rsf/internal.o rsf/leafLink.o \
+  rsf/marginal.o rsf/nodeOps.o rsf/nrutil.o rsf/partial.o rsf/polarity.o \
+  rsf/processEnsemble.o rsf/quantile.o rsf/random.o rsf/regression.o rsf/rfsrc.o \
+  rsf/rfsrcUtil.o rsf/sampling.o rsf/sexpOutgoing.o rsf/sortedLink.o rsf/split.o rsf/splitClas.o \
+  rsf/splitCustom.o rsf/splitCustomDriver.o rsf/splitGreedy.o rsf/splitMahalanobis.o \
+  rsf/splitMult.o rsf/splitQuantile.o rsf/splitRegr.o rsf/splitSurv.o rsf/splitUtil.o \
+  rsf/splitUtilSurv.o rsf/stack.o rsf/stackOutput.o rsf/stackOutputQQ.o \
+  rsf/stackParallel.o rsf/stackPreDefined.o rsf/survival.o rsf/survivalE.o \
+  rsf/svdUtil.o rsf/termOps.o rsf/trace.o rsf/tree.o rsf/treeJIT.o rsf/treeUtil.o \
+  rsf/cindex.o rsf/distance.o rsf/entry.o rsf/error.o rsf/nativeUtil.o
+
+.PHONY: all clean
+all: $(SHLIB)
+
+clean:
+	rm -f $(OBJECTS) $(SHLIB)

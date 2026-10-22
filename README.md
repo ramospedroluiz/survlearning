@@ -21,17 +21,20 @@ supported methods are available without additional package-installation steps.
 The initial download includes these dependencies and their own requirements;
 source installations may also require a compiler toolchain. Fitting functions
 do not install software or download data. Neural Cox fitting needs neither
-Torch nor Python. This version is available from GitHub, not CRAN.
+Torch nor Python. The package is not yet on CRAN.
 
 For a downloaded source archive, use an installer that resolves dependencies:
 
 ```r
-remotes::install_local("survlearning_0.2.6.tar.gz", dependencies = NA)
+remotes::install_local("survlearning_0.3.0.tar.gz", dependencies = NA)
 ```
 
 Base R's `install.packages(..., repos = NULL)` installs a local archive but does
-not download its missing dependencies. Development tools and the `survivalsvm`
-reference implementation are suggested packages, not required for analysis.
+not download its missing dependencies. RSF, Royston-Parmar and Gehan penalized
+AFT fitting are integrated. The original `randomForestSRC`, `flexsurv`, `penAFT`
+and `survivalsvm` packages are used only for independent reference tests, not
+for fitting or prediction. Source builds require a C/C++ compiler; OpenMP is
+optional. Included upstream-derived code is credited in `inst/COPYRIGHTS`.
 
 ## Fit and predict
 
@@ -135,10 +138,10 @@ horizon; quantiles not reached on the prediction grid are returned as `NA`.
 | `km` | survival | constant risk, survival |
 | `aft` | survival | risk, median, survival |
 | `cox`, `cox_spline` | survival | risk, survival |
-| `aft_lasso`, `aft_ridge`, `aft_elasticnet` | penAFT | risk |
+| `aft_lasso`, `aft_ridge`, `aft_elasticnet` | integrated Gehan ADMM | risk |
 | `cox_lasso`, `cox_ridge`, `cox_elasticnet` | glmnet | risk, survival |
 | `tree` | rpart | risk |
-| `rsf` | randomForestSRC | risk, survival |
+| `rsf` | integrated RF-SRC core | risk, survival |
 | `ranger` | ranger | risk, survival |
 | `aorsf` | aorsf | risk, survival |
 | `boosting` | gbm | risk |
@@ -147,7 +150,7 @@ horizon; quantiles not reached on the prediction grid are returned as `NA`.
 | `xgboost_aft` | xgboost | risk, median, survival |
 | `mtlr` | MTLR | risk, survival |
 | `svm` | native R; Clarabel, OSQP, quadprog, or Newton | risk |
-| `flexsurv` | flexsurv | risk, survival |
+| `flexsurv` | integrated Royston-Parmar | risk, survival |
 | `neural_cox` | native R | risk, survival |
 | `neural_discrete` | nnet | risk, survival |
 

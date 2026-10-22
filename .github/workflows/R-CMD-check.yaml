@@ -45,11 +45,11 @@ jobs:
           _R_CHECK_CRAN_INCOMING_: false
           _R_CHECK_FORCE_SUGGESTS_: true
         run: |
-          archive <- "artifacts/survlearning_0.2.6.tar.gz"
+          archive <- "artifacts/survlearning_0.3.0.tar.gz"
           stopifnot(file.exists(archive))
           print(tools::md5sum(archive))
           rcmdcheck::rcmdcheck(path = archive,
-            args = c("--no-manual", "--as-cran"),
+            args = c("--no-manual", "--as-cran", "--run-donttest"),
             error_on = "warning", check_dir = "check")
           tests <- "check/survlearning.Rcheck/tests/testthat.Rout"
           stopifnot(file.exists(tests))

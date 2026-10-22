@@ -117,7 +117,7 @@ test_that("Cox splines preserve training knots and native predictions", {
   expect_identical(attr(fit$engine$terms, "predvars"), calls)
 })
 
-for (id in c("flexsurv", "coxboost", "ranger", "aorsf")) {
+for (id in c("coxboost", "ranger", "aorsf")) {
   local({
     method <- id
     test_that(paste("new engine agrees with its native API:", method), {
@@ -128,8 +128,6 @@ for (id in c("flexsurv", "coxboost", "ranger", "aorsf")) {
       x <- survlearning:::.new_design(fit$design, new)
       times <- c(2, 5)
       expected <- switch(method,
-        flexsurv = t(vapply(summary(fit$engine, newdata = as.data.frame(x),
-          t = times, type = "survival", ci = FALSE), function(row) row$est, numeric(2L))),
         coxboost = predict(fit$engine, newdata = x, type = "risk", times = times,
           at.step = fit$params$steps),
         ranger = {

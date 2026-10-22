@@ -30,7 +30,10 @@ surv_compare(list(km = km, smooth = smooth), d)
 These are resubstitution examples, not held-out performance claims. Training
 spline bases are reused at prediction. Covariate splines do not remove PH.
 
-`flexsurv` provides Royston-Parmar hazard, odds or normal-scale models.
+The `flexsurv` method identifier provides Royston-Parmar hazard, odds or
+normal-scale models through the integrated likelihood implementation. The
+identifier is retained for compatibility; the external package is not needed
+for fitting or prediction.
 `coxboost` is componentwise likelihood boosting, distinct from gbm/XGBoost trees.
 `ranger` is an alternative forest engine; `aorsf` provides oblique forest splits.
 

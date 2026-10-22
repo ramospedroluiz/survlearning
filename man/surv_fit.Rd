@@ -103,7 +103,8 @@ are standardized using training means and standard deviations for SVM
 penalized AFT, and MTLR. Other engines receive the unscaled design; glmnet
 performs its own training-only standardization.
 
-Penalized AFT uses penAFT's Gehan loss and returns a relative risk ordering,
+Penalized AFT uses the Gehan loss and an integrated ADMM solver adapted from
+penAFT. It returns a relative risk ordering,
 not absolute survival times. Cox boosting means gradient-boosted trees with
 Cox loss (gbm), not the componentwise algorithm in the CoxBoost package.
 Dependencies are loaded only for the selected engine.

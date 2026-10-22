@@ -68,7 +68,8 @@
 #' penalized AFT, and MTLR. Other engines receive the unscaled design; glmnet
 #' performs its own training-only standardization.
 #'
-#' Penalized AFT uses penAFT's Gehan loss and returns a relative risk ordering,
+#' Penalized AFT uses the Gehan loss and an integrated ADMM solver adapted from
+#' penAFT. It returns a relative risk ordering,
 #' not absolute survival times. Cox boosting means gradient-boosted trees with
 #' Cox loss (gbm), not the componentwise algorithm in the CoxBoost package.
 #' Dependencies are loaded only for the selected engine.
@@ -178,6 +179,9 @@ surv_fit <- function(formula, data, method = "cox", params = list(), seed = NULL
     if (method == "neural_discrete") out$diagnostics$coarsening <- engine$coarsening
   }
   if (method == "svm") out$diagnostics$engine_details <- engine$diagnostics
+  if (method %in% c("aft_lasso", "aft_ridge", "aft_elasticnet", "flexsurv")) {
+    out$diagnostics$engine_details <- engine$diagnostics
+  }
   out
 }
 
@@ -195,11 +199,8 @@ surv_fit <- function(formula, data, method = "cox", params = list(), seed = NULL
   switch(method,
     aft = survival::survreg(formula, data = data, dist = params$distribution),
     aft_lasso = , aft_ridge = , aft_elasticnet = {
-      penAFT::penAFT(X = x, logY = log(y[, 1L]), delta = y[, 2L],
-        lambda = params$lambda, penalty = "EN",
-        alpha = if (method == "aft_elasticnet") params$alpha else as.integer(method == "aft_lasso"),
-        standardize = FALSE, admm.max.iter = params$max_iter,
-        tol.rel = params$tolerance, quiet = TRUE)
+      .fit_gehan(x, y, params,
+        if (method == "aft_elasticnet") params$alpha else as.integer(method == "aft_lasso"))
     },
     cox = survival::coxph(formula, data = data, ties = "efron", x = TRUE, y = TRUE),
     cox_lasso = , cox_ridge = , cox_elasticnet = {
@@ -213,9 +214,7 @@ surv_fit <- function(formula, data, method = "cox", params = list(), seed = NULL
     rsf = {
       old <- options(rf.cores = params$threads)
       on.exit(options(old), add = TRUE)
-      randomForestSRC::rfsrc(formula, data = data, ntree = params$trees,
-        mtry = params$mtry, nodesize = params$min_node, nsplit = params$splits,
-        splitrule = "logrank", importance = FALSE, seed = seed)
+      .fit_rsf(formula, data, params, seed)
     },
     boosting = gbm::gbm(formula, data = data, distribution = "coxph",
       n.trees = params$trees, interaction.depth = params$depth,

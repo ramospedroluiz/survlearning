@@ -1,22 +1,45 @@
-survlearning is distributed under GNU GPL version 3 or later.
+survlearning includes the following upstream-derived numerical components.
 
-The censored-regression SVM quadratic program and the five-decimal support and
-intercept conventions in R/svm.R follow survivalsvm 0.0.6, whose DESCRIPTION
-credits Cesaire J. K. Fouodo and declares GPL. The compact factorization,
-additive prefix operators, multiplicity reduction, certified Newton solver and
-linear/additive kernels are implementations in survlearning. Since 0.2.1,
-survivalsvm is needed only for optional independent reference tests, not for
-fitting, tuning or prediction. See https://github.com/imbs-hl/survivalsvm.
+Random survival forests
+----------------------
+Source: randomForestSRC 3.9.0, https://www.randomforestsrc.org/
+Authors: Hemant Ishwaran and Udaya B. Kogalur.
+License: GNU General Public License, version 3 or later.
+Upstream archive SHA256:
+82E353BC2078C6EF1C4E7A08114192660281B7107C25431F30379C7FC74A2DE3
 
-The explicit dense solver calls quadprog::solve.QP through its exported API.
-Its constraint order preserves the convention of the former pracma::quadprog
-wrapper (pracma, Hans W. Borchers, GPL >= 3); pracma is no longer a dependency.
+Files: src/rsf/* and R/rsf-core.R.
+The numerical core is retained; native identifiers are isolated and registration
+is provided by survlearning. R helpers are restricted to the fit/predict
+dependency closure in a private environment. Browser-tree visualization,
+external graphical dependencies and unrelated public interfaces are not exposed.
+This is derived upstream software, not a claim of original algorithm authorship.
 
-All other engine packages are called through their exported APIs.
-Their authors retain authorship and their respective licenses. They are not
-redistributed as embedded package sources or binaries. This wrapper does not
-claim authorship of the statistical methods implemented by these engines.
+Royston-Parmar initialization and basis conventions
+-------------------------------------------------
+Source: flexsurv 2.3.2, https://github.com/chjackson/flexsurv
+Authors: Christopher Jackson and contributors listed in that release.
+License: GNU General Public License, version 2 or later.
+Upstream archive SHA256:
+5B6705197A1B7C9F46BD7F4A02B3C66B4BA7EB413CDC0D649C6DA1D433AAE184
 
-R, its recommended packages and withr retain their own authorship and licenses.
-No Backblaze data are included in the source package. Data supplied separately
-with the article retain Backblaze's data-use conditions, not the software GPL.
+File: R/royston-parmar.R. The right-censored initialization is adapted from
+flexsurv.splineinits and flexsurv.splineinits.cox. The same natural cubic spline
+basis, event-time knot convention and BFGS fitting method are used. The focused
+likelihood, derivatives and prediction implementation do not include the
+general multistate, interval-censored or graphical interfaces of flexsurv.
+
+Gehan elastic-net ADMM
+---------------------
+Source: penAFT 0.3.2, Aaron J. Molstad and Piotr M. Suder.
+License: GNU General Public License, version 2 or later.
+Upstream archive SHA256:
+5A2575DC83388FDE6BD51C6C23B7EC4B56CD5B532B8C91D9D7E00D6A70CA941D
+
+Files: src/gehan.cpp and R/gehan.R. The scalar-penalty elastic-net path retains
+the upstream pair ordering, leading-singular-value step bound, ADMM updates,
+over-relaxation, adaptive rho and residual tolerances. Compressed adjacency
+replaces dense n-by-n incidence lookup matrices without dropping any pairs or
+observations. max_iter is honored (the upstream wrapper hard-codes 5000).
+An exact sorted-residual objective and feasible dual lower bound are added.
+Plotting, sparse-group penalties and separate cross-validation are not included.

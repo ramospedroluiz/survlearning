@@ -8,3 +8,8 @@ Rplots.pdf
 docs/
 inst/doc/
 /survlearning_*.tar.gz
+src/*.o
+src/*.dll
+src/*.so
+src/rsf/*.o
+src/Makevars

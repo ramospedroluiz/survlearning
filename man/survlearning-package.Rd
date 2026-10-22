@@ -27,5 +27,14 @@ Authors:
   \item Pedro Luiz Ramos \email{pedro.ramos@uc.cl}
 }
 
+Other contributors:
+\itemize{
+  \item Hemant Ishwaran (Included RF-SRC code) [contributor]
+  \item Udaya B. Kogalur (Included RF-SRC code) [contributor]
+  \item Christopher Jackson (Adapted Royston-Parmar initialization) [contributor]
+  \item Aaron J. Molstad (Adapted Gehan ADMM) [contributor]
+  \item Piotr M. Suder (Adapted Gehan ADMM) [contributor]
+}
+
 }
 \keyword{internal}
