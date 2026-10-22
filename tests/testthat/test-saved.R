@@ -9,19 +9,23 @@ test_that("restored fits load their engine before S3 prediction", {
   saveRDS(fit, path)
   root <- normalizePath(testthat::test_path("..", ".."), winslash = "/")
   result <- callr::r(function(path, new, root) {
-    if (file.exists(file.path(root, "R", "fit.R")) &&
-        requireNamespace("pkgload", quietly = TRUE)) pkgload::load_all(root, quiet = TRUE)
+    development <- file.exists(file.path(root, "R", "fit.R")) &&
+      requireNamespace("pkgload", quietly = TRUE)
+    if (development) pkgload::load_all(root, quiet = TRUE)
     else library(survlearning)
     before <- "glmnet" %in% loadedNamespaces()
     restored <- readRDS(path)
     after_read <- "glmnet" %in% loadedNamespaces()
     prediction <- survlearning::surv_predict(restored, new)
     list(before = before, after_read = after_read, prediction = prediction,
-      loaded = "glmnet" %in% loadedNamespaces())
+      loaded = "glmnet" %in% loadedNamespaces(), development = development)
   }, args = list(path = path, new = new, root = root), libpath = .libPaths(),
     user_profile = FALSE, system_profile = FALSE)
-  expect_false(result$before)
-  expect_false(result$after_read)
+  # pkgload eagerly loads Imports; installed packages exercise lazy loading.
+  if (!result$development) {
+    expect_false(result$before)
+    expect_false(result$after_read)
+  }
   expect_equal(result$prediction, expected)
   expect_true(result$loaded)
 })

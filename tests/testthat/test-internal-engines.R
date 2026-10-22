@@ -16,7 +16,12 @@ test_that("integrated RSF agrees with upstream with tied times and factors", {
     expect_equal(unname(surv_predict(fit, d, "survival", original$time.interest)),
       original$survival, tolerance = 1e-12)
     restored <- unserialize(serialize(fit, NULL))
-    expect_identical(surv_predict(restored, d), surv_predict(fit, d))
+    if (threads == 1L) {
+      expect_identical(surv_predict(restored, d), surv_predict(fit, d))
+    } else {
+      # Parallel ensemble reductions can change the last floating-point bits.
+      expect_equal(surv_predict(restored, d), surv_predict(fit, d), tolerance = 1e-12)
+    }
     legacy <- fit
     legacy$engine <- native
     expect_equal(surv_predict(legacy, d), surv_predict(fit, d), tolerance = 1e-12)
