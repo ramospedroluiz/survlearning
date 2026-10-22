@@ -1,0 +1,22 @@
+survlearning is distributed under GNU GPL version 3 or later.
+
+The censored-regression SVM quadratic program and the five-decimal support and
+intercept conventions in R/svm.R follow survivalsvm 0.0.6, whose DESCRIPTION
+credits Cesaire J. K. Fouodo and declares GPL. The compact factorization,
+additive prefix operators, multiplicity reduction, certified Newton solver and
+linear/additive kernels are implementations in survlearning. Since 0.2.1,
+survivalsvm is needed only for optional independent reference tests, not for
+fitting, tuning or prediction. See https://github.com/imbs-hl/survivalsvm.
+
+The explicit dense solver calls quadprog::solve.QP through its exported API.
+Its constraint order preserves the convention of the former pracma::quadprog
+wrapper (pracma, Hans W. Borchers, GPL >= 3); pracma is no longer a dependency.
+
+All other optional engine packages are called through their exported APIs.
+Their authors retain authorship and their respective licenses. They are not
+redistributed as embedded package sources or binaries. This wrapper does not
+claim authorship of the statistical methods implemented by these engines.
+
+R, its recommended packages and withr retain their own authorship and licenses.
+No Backblaze data are included in the source package. Data supplied separately
+with the article retain Backblaze's data-use conditions, not the software GPL.

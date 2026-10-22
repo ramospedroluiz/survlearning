@@ -1,0 +1,130 @@
+---
+title: "Reference models and native R neural survival engines"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Reference models and native R neural survival engines}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+library(survlearning)
+```
+
+## Informative references
+
+Kaplan-Meier ignores covariates and provides a probability baseline. Its
+constant risk scores give concordance 0.5 when comparable pairs exist. Cox
+with natural splines checks whether smooth nonlinear effects explain an
+apparent advantage of complex learners.
+
+```{r references}
+d <- survival::veteran
+f <- Surv(time, status) ~ age + karno
+km <- surv_fit(f, d, "km")
+smooth <- surv_fit(f, d, "cox_spline", params = list(df = 3))
+surv_compare(list(km = km, smooth = smooth), d)
+```
+
+These are resubstitution examples, not held-out performance claims. Training
+spline bases are reused at prediction. Covariate splines do not remove PH.
+
+`flexsurv` provides Royston-Parmar hazard, odds or normal-scale models.
+`coxboost` is componentwise likelihood boosting, distinct from gbm/XGBoost trees.
+`ranger` is an alternative forest engine; `aorsf` provides oblique forest splits.
+
+```{r optional, eval=FALSE}
+install.packages(c("flexsurv", "CoxBoost", "ranger", "aorsf"))
+surv_fit(f, d, "flexsurv", list(knots = 1, scale = "hazard"))
+surv_fit(f, d, "coxboost", list(steps = 100, penalty = 100))
+surv_fit(f, d, "ranger", list(trees = 200))
+surv_fit(f, d, "aorsf", list(trees = 200))
+```
+
+## Neural Cox
+
+For $\lambda(t\mid x)=\lambda_0(t)\exp\{f_\theta(x)\}$, a neural network
+replaces the linear predictor. With untied events, the loss is
+
+$$
+-\sum_{i:\delta_i=1}\left[f_\theta(x_i)-
+\log\left\{\sum_{j:Y_j\geq Y_i}\exp(f_\theta(x_j))\right\}\right]
++\text{regularization}.
+$$
+
+This remains PH. Nonlinear covariate effects are not time-varying hazard ratios.
+A Breslow baseline estimated on training converts scores to probabilities.
+
+The native adapter uses R matrix operations and analytic backpropagation, with
+no Torch, Python, or external neural runtime. A single tanh hidden layer and
+linear log-risk output are trained by full-batch Adam. The penalty is
+$\texttt{decay}\|\theta\|^2/2$, including biases. Training uses double precision.
+Fixed epochs do not establish convergence; the final objective and maximum
+absolute gradient are exposed in diagnostics.
+
+At each distinct event time, let $D_g$ be the deaths, $d_g=|D_g|$,
+$R_g$ the entire risk set (including censorings at that time),
+$S_g=\sum_{j\in R_g}\exp(f_\theta(x_j))$ and
+$E_g=\sum_{j\in D_g}\exp(f_\theta(x_j))$. Efron's contribution to the log
+partial likelihood is
+
+$$
+\sum_{i\in D_g} f_\theta(x_i)-
+\sum_{l=0}^{d_g-1}\log\{S_g-(l/d_g)E_g\}.
+$$
+
+Breslow uses $d_g\log S_g$ instead of the second sum. The loss averages over
+the observed deaths. The baseline increment is the sum of the corresponding
+inverse denominators, so prediction uses the same ties convention as training.
+No times are jittered. Stable log-domain risk sums and baseline storage avoid
+overflow. These approximations are not the exact discrete partial likelihood.
+
+```{r neural-cox, eval=FALSE}
+fit <- surv_fit(f, training, "neural_cox",
+  params = list(hidden = 16, epochs = 100, learning_rate = 0.001,
+    decay = 0.0001, ties = "efron"))
+surv_predict(fit, new_equipment, "survival", times = c(30, 60, 90))
+```
+
+## Discrete-time neural survival
+
+Let $h_k(x)=P(T\in I_k\mid T\geq\inf I_k,x)$. PLANN models interval
+failure probabilities with covariates and interval information. Its likelihood
+uses failures and known survival through completed intervals; censored rows
+are not labeled as failures. Endpoint survival is
+
+$$
+S(t_k\mid x)=\prod_{\ell\leq k}\{1-h_\ell(x)\}.
+$$
+
+Time in a nonlinear network can permit non-PH effects. Interval construction,
+within-interval censoring and resolution remain substantive modeling choices.
+The adapter constructs person-period rows and uses `nnet`'s Bernoulli entropy
+loss. Events contribute their failure interval; censoring contributes only
+fully completed intervals. An incomplete censoring interval is never labeled
+as survived. This coarsening discards within-interval timing information and
+can introduce discretization bias. A canonical fixed-size grid and scaling
+are learned on training; endpoint probabilities are returned as a step function.
+Risk is negative restricted mean on that grid, not an extrapolated full mean.
+
+```{r neural-discrete, eval=FALSE}
+install.packages("nnet")
+fit <- surv_fit(f, d, "neural_discrete",
+  params = list(hidden = 8, intervals = 10, decay = 0.01, max_iter = 500))
+surv_predict(fit, d[1:2, ], "survival", times = c(30, 60, 90))
+surv_diagnostics(fit)
+```
+
+Heavy engines are not needed for core models. Grids must be explicit and the
+final test must not choose training duration. Saved models are tested in fresh
+R sessions; live external pointers do not provide general serialization.
+
+## References
+
+- [Jackson (2016), flexsurv](https://www.jstatsoft.org/article/view/v070i08).
+- [Wright and Ziegler (2017), ranger](https://www.jstatsoft.org/article/view/v077i01).
+- [aorsf](https://CRAN.R-project.org/package=aorsf).
+- [CoxBoost](https://CRAN.R-project.org/package=CoxBoost).
+- [DeepSurv (Katzman et al., 2018)](https://doi.org/10.1186/s12874-018-0482-1).
+- [nnet, Bernoulli neural-network engine](https://CRAN.R-project.org/package=nnet).

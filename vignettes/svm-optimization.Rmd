@@ -1,0 +1,264 @@
+---
+title: "Censored regression SVM: linear and additive structure"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Censored regression SVM: linear and additive structure}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+## Censored support vector regression
+
+`method = "svm"` fits a censored **regression** SVM to all training rows.
+Its objective differs from ranking SVM and ordinary regression on observed times.
+The default is compact `solver = "clarabel"`, an optional R dependency.
+There is no silent dense fallback. Explicit `solver = "quadprog"` retains
+the dense reference numerical path. Explicit
+`solver = "osqp"`, `solver = "clarabel"` or `solver = "newton"` uses compact
+algebra for linear and additive kernels, preserving the reference's adjusted
+quadratic objective. There is no automatic solver or kernel substitution.
+
+The implementation follows the regression convention in `survivalsvm` 0.0.6,
+including its `Matrix::nearPD` correction and five-decimal support coefficients.
+It does not claim that this correction is a new statistical method or that it
+is identical to every textbook formulation of censored SVR.
+
+Both kernels are implemented internally. Fitting, tuning
+and prediction do not require `survivalsvm` or `pracma`. `survivalsvm` is retained
+only for optional independent reference tests. The dense path calls
+`quadprog::solve.QP` directly, with the same objective signs and constraint order
+as the reference implementation. Linear Newton uses only mandatory package dependencies;
+the default needs `clarabel`, OSQP needs `osqp`, the dense reference needs
+`quadprog`, and compact additive fits additionally need `RSpectra`.
+The dense solver provides a numerical reference. It can return an
+infeasible iterate on ill-conditioned linear problems. Non-finite or infeasible
+solutions cause an error before a model is returned.
+They cannot produce predictions or win tuning. Prediction also rejects saved
+engines explicitly marked as infeasible or failed. The compact solvers are
+the recommended computational paths.
+
+## The reference quadratic program
+
+Let $X$ denote the training-standardized design, $t$ observed positive times,
+$\delta$ event indicators, and $K$ the selected kernel ($XX^\top$ for linear).
+Define
+\[
+q=(-t^\top,(\delta\odot t)^\top)^\top,\qquad
+a=(-\mathbf{1}^\top,\delta^\top)^\top.
+\]
+The numerical reference minimizes
+\[
+\frac12 u^\top H u+q^\top u,
+\qquad a^\top u=0,\quad 0\leq u_i\leq C,
+\]
+where $u$ contains $2n$ coefficients and $H$ is the positive-definite matrix
+returned by `nearPD` for the block matrix assembled by the reference engine.
+Its symmetrized form is
+\[
+\begin{pmatrix}K&-M\\-M&K\end{pmatrix},\qquad
+M=\tfrac12\{\operatorname{diag}(\delta)K+
+ K\operatorname{diag}(\delta)\}.
+\]
+Switching directly to the engine's `ipop` path is **not** an equivalent
+replacement: that path does not apply the same `nearPD` correction.
+
+## Linear structure, without a kernel approximation
+
+Write $Z=\operatorname{diag}(\delta)X$. Both $K+M$ and $K-M$ lie in the
+column span of $[X,Z]$. A thin SVD of this matrix therefore reduces the
+nonzero eigensystems to at most $2p$ dimensions each. The implementation
+removes only numerical SVD null directions (relative threshold $10^{-12}$),
+well below the reference eigenvalue cutoff $10^{-6}$.
+
+Let $Q\Lambda Q^\top$ be the reference's retained positive projection and
+$\epsilon=10^{-8}\lambda_{\max}$. Without correlation or fixed-diagonal
+constraints, the repeated positive projection in `nearPD` is unchanged.
+Its final eigenvalue floor and diagonal rescaling can be written as
+\[
+H=S\{\epsilon I+Q(\Lambda-\epsilon I)Q^\top\}S
+  =D_0+LL^\top,
+\]
+where $S$ is the same diagonal rescaling, $D_0=\epsilon S^2$ and
+$L=SQ(\Lambda-\epsilon I)^{1/2}$. Consequently, the equivalent sparse QP is
+\[
+\min_{u,v}\ \frac12u^\top D_0u+\frac12v^\top v+q^\top u,
+\quad v=L^\top u,\quad a^\top u=0,\quad 0\leq u\leq C.
+\]
+All $n$ observations still enter the objective and constraints. This is not
+Nystrom, random features, or a truncated kernel approximation. Storage for
+the design and Hessian factors is proportional to $np+nr$, where $r$ is the
+retained rank, rather than storing the dense $2n$ by $2n$ Hessian. Solver
+factorizations have additional memory costs; the package does not promise
+linear runtime for arbitrary designs.
+
+## Additive structure and the same spectral cutoff
+
+The additive kernel in the reference, on numeric encoded columns, is
+\[
+K_{i\ell}=\sum_{j=1}^p\left(1-
+ \frac{|x_{ij}-x_{\ell j}|}{R_j}\right),\qquad
+R_j=\max_i x_{ij}-\min_i x_{ij}.
+\]
+For a column sorted as $t_1\le\cdots\le t_n$, let $A_i=\sum_{\ell\le i}v_\ell$
+and $B_i=\sum_{\ell\le i}t_\ell v_\ell$. Then
+\[
+\sum_\ell |t_i-t_\ell|v_\ell
+ =t_i(2A_i-A_n)-(2B_i-B_n).
+\]
+This identity works for signed vectors and ties. Products with $K$ require
+sorted prefix sums, not an $n$ by $n$ array. Products with $K\pm M$ follow
+using two products with $K$ and elementwise multiplication by $\delta$.
+
+RSpectra computes the largest algebraic eigenvalues of these operators.
+The requested count grows until the converged spectrum includes an eigenvalue
+below the **reference's existing** $10^{-6}\lambda_{\max}$ cutoff. There is no
+user-selected smaller rank. Residuals, the excluded boundary and the cutoff are
+stored; incomplete or numerically ambiguous boundary results raise errors.
+Small or nearly full-rank blocks use dense block eigendecomposition only if
+the memory planning limit allows it. The same positive floor and original-row
+diagonal rescaling are then applied. This is a numerical eigensolver for the
+reference projection, not a claim of symbolic or bitwise arithmetic equality.
+
+Prediction uses the same prefix identity with support coefficients. Ranges
+are calculated from the **support vectors**, as in the original implementation,
+not silently replaced by the full training ranges. Values outside those ranges
+are evaluated by the original formula, not clipped.
+
+## Exact multiplicities, not a training subsample
+
+Only rows with identical encoded predictors, observed time **and** event may
+share a frequency group. Let $P$ be group membership, $W=\operatorname{diag}(m_g)$
+the multiplicities, and $R=PW^{-1/2}$, so $R^\top R=I$. Kernel spectra are
+computed with $W^{1/2}K_gW^{1/2}$, not the unweighted representative matrix.
+The full reference diagonal rescaling is recovered before restricting the QP;
+applying `nearPD` naively to an unweighted reduced data set is not equivalent.
+
+Permutation symmetry within a group, the identical linear terms, equal bounds
+and strictly positive diagonal floor imply that the unique optimum has equal
+coordinates within each group. With $U=\operatorname{blockdiag}(R,R)$,
+the exact restriction $u=Uz$ gives
+\[
+\min_z\ \tfrac12z^\top U^\top HU z+(U^\top q)^\top z,
+\quad (U^\top a)^\top z=0,\quad 0\le z_g\le C\sqrt{m_g}.
+\]
+Every original coefficient is restored as $u_i=z_{g(i)}/\sqrt{m_{g(i)}}$
+**before** rounding and support selection. Thus support residual means still
+count all original observations. Counts, membership and original-length dual
+coefficients remain available in the fit. Set `collapse_duplicates = FALSE`
+to audit without this algebraic compression. It is not censoring-dependent
+subsampling, approximate deduplication, or a change of the penalty per row.
+
+## An equivalent small dual and Newton solver
+
+For a compact QP with $H=D_0+LL^\top$, write $d_i=(D_0)_{ii}>0$ and $b_i$
+for its box bounds (including multiplicity scaling, when used). Define
+\[
+\psi_i(s)=\min_{0\le z_i\le b_i}
+ \{\tfrac12d_i z_i^2+s z_i\},\qquad
+z_i(s)=\min\{b_i,\max(0,-s/d_i)\}.
+\]
+The negative dual is
+\[
+F(\theta,\mu)=\tfrac12\|\theta\|^2-
+ \sum_i\psi_i(q_i+L_i^\top\theta+\mu a_i).
+\]
+For each $\theta$, a monotone scalar root solve enforces $a^\top z=0$.
+The remaining problem has only $r$ free coordinates, where $r$ is the number
+of modes retained by the reference projection. Its gradient is
+$\theta-L^\top z$. On a cell with free box coordinates $A$, its Hessian is
+\[
+I+L_A^\top D_A^{-1}L_A-
+\frac{(L_A^\top D_A^{-1}a_A)(L_A^\top D_A^{-1}a_A)^\top}
+ {a_A^\top D_A^{-1}a_A},
+\]
+with the last term omitted if its denominator vanishes. The value is
+continuously differentiable and piecewise quadratic; this is not a claim of
+global twice differentiability at box transitions.
+
+`solver = "newton"` supplies these analytic derivatives to R's `stats::nlm`,
+using `stats::uniroot` for the equality. Solver status alone is insufficient.
+Box stationarity holds by construction, and an independent certificate checks
+the equality and the conservative gap bound
+\[
+\tfrac12\|\theta-L^\top z\|^2+|\mu a^\top z|.
+\]
+The relative bound must not exceed `tolerance`; equality must satisfy
+`max(1e-7, 10 * tolerance)`. Iteration/step-limit failures are rejected.
+An `nlm` line-search stop is accepted only if the independent certificate passes;
+the optimizer code is retained separately. Analytic derivatives are also
+tested against finite differences away from box transitions.
+
+## Tuning and prediction
+
+```{r, eval=FALSE}
+fit <- surv_tune(Surv(time, event) ~ temperature + age, data,
+  method = "svm", grid = list(cost = c(0.01, 0.1, 1)),
+  params = list(solver = "clarabel"), folds = 3, cache = TRUE)
+fit$results
+surv_diagnostics(fit)
+surv_predict(fit, newdata)
+```
+
+Imputation and standardization are learned **inside each analysis split**.
+Within that split, cost candidates reuse the prepared design, Hessian and
+solver workspace. OSQP also supports warm starts. At most one kernel/solver
+workspace is retained, and nothing is shared between folds. Output rows retain
+the original candidate/fold ordering. `cache = FALSE` is the cold audit path.
+For four costs and three folds, Hessian preparation falls from twelve to three
+operations; the winning full-data refit is separate.
+
+For the linear kernel, prediction uses one vector
+$w=\sum_{i\in SV}\beta_i x_i$, so a new score is $-(x^\top w+b)$.
+This avoids constructing a support-vector by new-observation kernel matrix.
+Risk-only output is retained: no survival probability or life expectancy is
+attached to the fitted scores.
+
+## What equivalence means
+
+The audit checks the reconstructed Hessian against dense `nearPD`, compares
+objective values against an independent dense solver, tests feasibility and
+convergence, and compares centered scores, C-indices and tuning selections.
+It does **not** assume that matching a C-index proves equal coefficients.
+
+The historical intercept averages residuals over the support set selected
+after rounding coefficients to five decimals. Very small solver differences
+can change that set and shift every score by a constant. Raw score equality
+must therefore be checked separately from equality of ranking. Furthermore,
+the historical `quadprog` path can return numerically infeasible coefficients
+for ill-conditioned repaired Hessians on the tested system. Such a result is
+reported as optimizer failure and cannot win tuning. It is not a valid gold
+standard simply because its software call returned successfully.
+
+Only OSQP's full `solved` and Clarabel's full `Solved` statuses are accepted;
+Newton uses the independent certificate described above. Iteration limits and
+reduced-accuracy external-solver statuses raise errors. Diagnostics retain
+the objective, constraint violation, iteration count, primal/dual residuals,
+duality gap, support count, solver version and cache use. The feasibility check
+uses an absolute threshold `max(1e-5, 100 * tolerance)` on the unrounded dual.
+
+## Limits and reproducible measurements
+
+The reference quadprog path remains dense. Compact additive fits still need
+storage for their retained eigenvectors/factors, and can exceed a memory budget
+when the required rank is large. No extra modes are dropped to fit that budget.
+`memory_limit_mb` is a
+workspace **planning estimate**, not a hard runtime cap or measured memory maximum.
+Exceeding it raises an error without removing observations. Raising the limit
+does not create additional physical RAM.
+
+The accompanying article measures elapsed time and process memory using fresh
+R processes. Peak working set includes loaded libraries, whereas fitting time
+excludes process startup. Planning estimates and measured peaks describe
+different quantities. The application uses dated first-snapshot predictors and
+all 23,246 eligible training and 5,812 test drives; 14 source histories lack
+positive subsequent-failure follow-up. The replication scripts and measurement
+protocol are available in the repository's `paper` directory. Timings apply to
+the recorded environment, not every dataset or computing system.
+For a sequential additive-kernel example, see
+`inst/examples/05_optimized_additive_svm.R` in the package source.
+
+Solver documentation: [OSQP](https://osqp.org/docs/solver/index.html),
+[OSQP R interface](https://cran.r-project.org/package=osqp), and
+[Clarabel R interface](https://cran.r-project.org/package=clarabel),
+[RSpectra](https://cran.r-project.org/package=RSpectra), and
+[R Newton minimizer](https://search.r-project.org/R/refmans/stats/html/nlm.html).

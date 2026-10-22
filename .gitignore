@@ -1,0 +1,10 @@
+.Rproj.user/
+.Rhistory
+.RData
+.Renviron
+.Rprofile
+Rplots.pdf
+*.Rcheck/
+docs/
+inst/doc/
+/survlearning_*.tar.gz

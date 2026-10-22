@@ -1,0 +1,166 @@
+---
+title: "Evaluation and validation for right-censored outcomes"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Evaluation and validation for right-censored outcomes}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+library(survlearning)
+```
+
+## Define the prediction target
+
+Write $Y_i=\min(T_i,C_i)$ and $\delta_i=I(T_i\leq C_i)$. A risk score $r_i$
+orders failures; $\widehat S_i(t)$ estimates $P(T_i>t\mid x_i)$. These outputs
+are not interchangeable. Risk-only models cannot be evaluated as probability
+models without an additional, explicitly trained calibration procedure.
+
+```{r example}
+d <- survival::veteran
+set.seed(17)
+id <- sample(seq_len(nrow(d)), 100)
+train <- d[id, ]
+test <- d[-id, ]
+f <- Surv(time, status) ~ age + karno
+fit <- surv_fit(f, train, "aft")
+surv_score(fit, test)
+```
+
+## Discrimination and probability accuracy
+
+With $a(r_i,r_j)=I(r_i>r_j)+\tfrac12 I(r_i=r_j)$, Harrell's index estimates
+correct ordering among comparable pairs. It is not sensitivity, a percentage of
+correctly predicted failure times, or a calibration measure.
+
+Let $\widehat G$ be a marginal censoring Kaplan-Meier estimate. Truncated IPCW
+concordance uses $w_i=\delta_i I(Y_i\leq\tau)/\widehat G(Y_i-)^2$:
+
+$$
+\widehat C_{\mathrm{IPCW}}(\tau)=
+\frac{\sum_{i,j}w_i I(Y_i<Y_j)a(r_i,r_j)}
+{\sum_{i,j}w_i I(Y_i<Y_j)}.
+$$
+
+The implementation uses strict observed-time comparisons and half credit for
+tied risk scores. Declare `tau`; do not extend it into an unsupported censoring
+tail. The censoring assumptions still matter.
+[Uno et al. (2011)](https://doi.org/10.1002/sim.4154) motivate IPCW concordance.
+
+For a horizon $t$, cumulative/dynamic AUC compares failures by $t$ with subjects
+surviving past $t$, weighting observed cases and controls for censoring.
+Brier error evaluates probabilities instead:
+
+$$
+\widehat{BS}(t)=\frac1n\sum_{i=1}^n\left[
+\frac{\delta_i I(Y_i\leq t)\widehat S_i(t)^2}{\widehat G(Y_i-)}+
+\frac{I(Y_i>t)\{1-\widehat S_i(t)\}^2}{\widehat G(t)}
+\right].
+$$
+
+For a supplied grid spanning $[a,b]$,
+
+$$
+\widehat{IBS}_{[a,b]}=\frac1{b-a}\int_a^b\widehat{BS}(t)\,dt,
+$$
+
+approximated by the trapezoidal rule. Report the interval and grid. Scores over
+different intervals are not automatically comparable. Discrimination and
+probability accuracy assess different targets, as discussed by
+[Haider et al. (2020)](https://www.jmlr.org/papers/v21/18-772.html).
+
+```{r metrics}
+ev <- surv_evaluate(fit, test,
+  metrics = c("harrell", "uno", "auc", "brier", "ibs"),
+  times = c(30, 60, 90), tau = 90)
+ev
+plot(ev, metric = "brier")
+```
+
+By default, `G` uses stored training outcomes, not the external test. The
+censoring mechanism must be compatible between samples. Users can provide
+`censoring_data` explicitly, or a reference `surv_censor_fit()` via
+`censoring_model` for marginal, stratified or Cox $G(t\mid x)$.
+Inspect status/message fields and censoring settings attached to
+the evaluation. Unstable small `G` values are not silently clipped.
+
+Under $\delta=I(T\leq C)$, tied failures precede censoring. With risk count
+$R(u)$, failures $d_E(u)$ and censorings $d_C(u)$, the reverse KM is
+$\widehat G(t)=\prod_{u\leq t}\{1-d_C(u)/(R(u)-d_E(u))\}$, with no decrement
+when there are no censorings. Simply swapping the event indicator gives the
+wrong censoring risk set at such ties. This convention agrees with
+[prodlim's documented reverse estimator](https://CRAN.R-project.org/package=prodlim).
+
+## Calibration and uncertainty
+
+Grouped calibration compares mean predicted survival with within-group KM at a
+specified horizon. Tied predictions can reduce the number of distinct groups.
+Small groups and few subjects at risk make calibration unstable. The diagnostic
+does not retrain or recalibrate the model.
+
+```{r calibration}
+cal <- surv_calibrate(fit, test, times = 60, groups = 3)
+cal
+plot(cal)
+```
+
+An explicit censoring fit makes the calibration assumption consistent with
+probability evaluation:
+
+```{r conditional-calibration}
+g <- surv_censor_fit(f, train, method = "cox")
+conditional_cal <- surv_calibrate(fit, test, times = 60, groups = 3,
+  censoring_model = g, n_boot = 100, seed = 14)
+conditional_cal
+```
+
+For each group, observed survival is normalized IPCW control mass divided
+by weighted case plus control mass. Event weights use $G(Y_i-\mid x_i)$ and
+controls use $G(t\mid x_i)$. This estimator is not a within-group KM curve.
+Its bootstrap fixes both fitted models and the original groups. Effective
+sample size, sparse events and undefined replicates remain visible.
+
+`surv_evaluate(..., n_boot = 200)` resamples evaluation cases while keeping the
+model and censoring KM fixed. Percentile intervals are conditional on those
+fits, not uncertainty of the full training/tuning process. For dependent rows,
+independent case bootstrap intervals are inappropriate; respect sampling units.
+
+## Shared and nested resampling
+
+```{r validation}
+splits <- surv_resamples(f, train, folds = 3, seed = 11)
+tuned <- surv_tune(f, train, "aft",
+  grid = list(distribution = c("weibull", "lognormal")), resamples = splits)
+tuned$results
+surv_score(tuned, test)
+
+validated <- surv_validate(f, train, methods = c("km", "cox", "aft"),
+  grids = list(aft = list(distribution = c("weibull", "lognormal"))),
+  resamples = splits, inner_folds = 3, seed = 12, metric = "harrell")
+validated$summary
+```
+
+Each outer assessment is excluded from tuning and preprocessing. Inner splits
+are generated within outer training. Failed candidates and warnings remain
+inspectable. A tuning criterion is not final held-out performance.
+`metric` selects inner candidates independently of the order of `metrics`.
+Use `selection_time` for one AUC/Brier tuning horizon when reporting several
+horizons. A missing required horizon is rejected before fitting. With
+`grid = NULL`, only one fixed configuration is evaluated; `summary(tuned)`
+states that no hyperparameter search took place.
+
+Grouped rows and future deployment require grouped or forward temporal designs.
+The inner design must preserve the outer design, not silently switch to random
+K-fold. Fold dispersion is descriptive, not an independent-sample standard error.
+Temporal ordering alone does not ensure that labels had already become known
+at a historical deployment date. Construct feature availability, follow-up
+cutoffs and any needed embargo before validating. Do not order by the observed
+survival response and call that prospective deployment validation.
+
+`impute = "median"` learns numeric medians and categorical modes separately
+within each fold, before formula transformations. Missing outcomes, entirely
+missing training predictors and unsupported new levels are rejected. A final
+test set is never used to stop neural training early.

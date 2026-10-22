@@ -1,0 +1,129 @@
+---
+title: "Interpretation, reliability summaries, and resumable tuning"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Interpretation, reliability summaries, and resumable tuning}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>", fig.width = 6, fig.height = 4)
+library(survlearning)
+```
+
+The executable English example is
+`system.file("examples/07_interpretation_reliability_workflow.R", package = "survlearning")`.
+It uses the Cox and parametric AFT engines already supplied by the mandatory
+`survival` dependency. No Torch, Python, or additional plotting framework is needed.
+
+## Interpreting a fixed predictor
+
+The following small example is self-contained. Censoring is generated independently
+of failure conditional on the two predictors, which are fixed at the time origin.
+
+```{r data}
+set.seed(20261026)
+d <- data.frame(load = runif(300, -1, 1), design = rbinom(300, 1, .5))
+failure_time <- rexp(300, rate = .02 * exp(.8 * d$load - .3 * d$design))
+censor_time <- pmin(80, rexp(300, rate = .02 * exp(.6 * d$load)))
+d$time <- pmin(failure_time, censor_time)
+d$event <- as.integer(failure_time <= censor_time)
+train <- d[1:200, ]
+test <- d[201:300, ]
+f <- Surv(time, event) ~ load + design
+fit <- surv_fit(f, train, "cox")
+profiles <- data.frame(load = c(-.5, .5), design = c(0, 1))
+```
+
+```{r}
+importance <- surv_importance(fit, test, n_repeats = 3, seed = 10)
+effects <- surv_ale(fit, test, variable = "load", bins = 10,
+  type = "failure", time = 10)
+plot(importance)
+plot(effects)
+```
+
+Permutation importance is the decrease in Harrell concordance after permuting
+original predictor columns. A named list groups columns for a shared permutation.
+Formula transformations are reevaluated; no fit is changed. SD measures only
+permutation variation. Correlated predictors complicate marginal importance.
+ALE accumulates within-bin prediction differences and centers upper-bin values
+by empirical frequencies. Repeated quantile boundaries and empty bins are merged.
+Neither calculation estimates a causal effect or supplies an uncertainty interval.
+Do not repeatedly select features using a final test sample.
+
+## Remaining-time summaries
+
+```{r}
+remaining <- surv_reliability(fit, profiles, age = 5,
+  horizons = c(10, 20), probs = c(.1, .5), grid_points = 501)
+remaining$summary
+remaining$quantiles
+```
+
+With fixed covariates, conditional survival is `S(age+u|x)/S(age|x)`.
+The restricted remaining mean uses trapezoidal integration only to the supplied
+horizon. Quantiles are first grid crossings; unreached quantiles remain missing.
+This does not estimate unrestricted lifetime, cure, or a prediction interval.
+Attained time refers to the fitted model's origin, not necessarily installation.
+Requests beyond follow-up require explicit parametric extrapolation; risk-only
+models cannot provide these summaries.
+
+## Conditional censoring weights
+
+```{r}
+g <- surv_censor_fit(Surv(time, event) ~ load + design, train, method = "cox")
+surv_evaluate(fit, test, c("ipcw_c", "auc", "brier"),
+  times = 10, tau = 15, censoring_model = g)
+```
+
+The formula uses the **original failure indicator**, not an already reversed
+indicator. Methods are `"km"`, `"stratified"`, and `"cox"`. Cox is a working
+proportional-hazards model for censoring; its adequacy is an assumption.
+Stratified KM supports joint categorical groups with observed reference support.
+At tied times, original failures depart before censoring hazards are estimated.
+Event weights use `G(T-|x)`; control weights use `G(t|x)`.
+No silent clipping or extrapolation repairs a lack of support.
+
+Conditional AUC weights both cases and controls. The `"ipcw_c"` criterion uses
+strictly ordered pairs and weight `1/{G(T_i-|x_i) G(T_i|x_j)}`.
+It is deliberately distinct from historical marginal `"uno"`.
+Bootstrap intervals condition on the fixed event and censoring fits.
+Within `surv_tune()` and `surv_validate()`, supply a formula or list specification
+through `censoring`; it is refitted on each analysis fold, never globally.
+
+## Local parallel execution and recovery
+
+```{r}
+checkpoint <- tempfile("survlearning-vignette-")
+tuned <- surv_tune(f, train, "aft",
+  grid = list(distribution = c("weibull", "lognormal")), folds = 2,
+  workers = 2, seed = 20, checkpoint = checkpoint)
+# Repeat exactly to reuse committed folds and the completed winning refit.
+resumed <- surv_tune(f, train, "aft",
+  grid = list(distribution = c("weibull", "lognormal")), folds = 2,
+  workers = 2, seed = 20, checkpoint = checkpoint)
+resumed$execution
+stopifnot(resumed$execution$computed_jobs == 0L,
+  resumed$execution$refit_reused)
+```
+
+Defaults remain serial and disk-free. Local PSOCK tasks are grouped by analysis
+fold to preserve SVM workspace reuse. Data, formulas, row order, fold plan,
+parameters, seeds, RNG/contrast settings, and software versions must match a
+checkpoint. Captured custom closures are not portable. Failed folds remain
+ineligible; `retry_failed = TRUE` explicitly retries their records.
+Within-fold solver warm-start histories are rebuilt, not restored.
+Only one live search may own a directory. Ordinary errors release its lock;
+after a hard crash, confirm no process remains before removing a stale lock.
+Workers duplicate data and numerical workspaces. Set engine `threads = 1` when
+using multiple workers, and choose their number to fit available memory.
+Neither a universal speedup nor aggregate-memory monitoring is promised.
+
+```{r cleanup, include=FALSE}
+target <- normalizePath(checkpoint, winslash = "/", mustWork = TRUE)
+parent <- normalizePath(tempdir(), winslash = "/", mustWork = TRUE)
+stopifnot(startsWith(tolower(target), paste0(tolower(parent), "/")))
+unlink(target, recursive = TRUE)
+```

@@ -1,0 +1,45 @@
+title: survlearning
+destination: docs
+development:
+  mode: unreleased
+template:
+  bootstrap: 5
+  light-switch: true
+reference:
+  - title: Fit and predict
+    contents:
+      - surv_fit
+      - surv_tune
+      - surv_predict
+  - title: Evaluate and validate
+    contents:
+      - surv_score
+      - surv_evaluate
+      - surv_calibrate
+      - surv_compare
+      - surv_resamples
+      - surv_validate
+      - surv_censor_fit
+      - surv_censor_predict
+      - plot.survlearning_calibration
+      - plot.survlearning_evaluation
+  - title: Interpretation and reliability
+    contents:
+      - surv_importance
+      - surv_ale
+      - surv_reliability
+      - plot.survlearning_importance
+      - plot.survlearning_ale
+      - plot.survlearning_reliability
+      - print.survlearning_reliability
+  - title: Inspect
+    contents:
+      - summary.survlearning_fit
+      - coef.survlearning_fit
+      - print.survlearning_fit
+      - print.survlearning_tune
+      - predict.survlearning_svm
+      - surv_methods
+      - surv_parameters
+      - Surv
+      - survlearning-package

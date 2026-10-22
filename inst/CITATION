@@ -1,0 +1,2 @@
+# Use the installed version and author metadata; no unpublished article DOI.
+citation(auto = meta)

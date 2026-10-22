@@ -1,0 +1,29 @@
+Package: survlearning
+Type: Package
+Title: Unified Statistical Learning for Survival and Reliability
+Version: 0.2.5
+Authors@R: person("Pedro Luiz", "Ramos", email = "pedro.ramos@uc.cl",
+    role = c("aut", "cre"))
+Description: Provides a small formula-based interface for fitting, tuning,
+    predicting, and comparing statistical learning models for right-censored
+    survival and reliability data. Provides censoring-aware evaluation,
+    reusable stratified, grouped and temporal validation, and nested tuning.
+    Distinguishes risk scores, survival probabilities and median survival
+    times. Includes reference models, forests, boosting and neural survival
+    models through optional engines, with training-only preprocessing and
+    explicit prediction capabilities.
+License: GPL (>= 3)
+URL: https://github.com/ramospedroluiz/survlearning
+BugReports: https://github.com/ramospedroluiz/survlearning/issues
+Encoding: UTF-8
+Depends: R (>= 4.1.0)
+Imports: stats, survival, graphics, utils, parallel, tools, withr (>= 2.5.0)
+Suggests: glmnet (>= 5.0), rpart, randomForestSRC, gbm, survivalsvm, penAFT,
+    xgboost (>= 3.0.0), MTLR (>= 0.2.2),
+    flexsurv, CoxBoost, ranger, aorsf, splines,
+    nnet,
+    Matrix, quadprog, osqp (>= 1.0.0), clarabel (>= 0.11.3), RSpectra,
+    testthat (>= 3.1.8), knitr, rmarkdown, callr, pkgload
+VignetteBuilder: knitr
+Config/testthat/edition: 3
+Config/roxygen2/version: 8.0.0
