@@ -1,0 +1,192 @@
+---
+title: "Survival SVMs: ranking, regression and censoring weights"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Survival SVMs: ranking, regression and censoring weights}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+library(survlearning)
+```
+
+## Distinct statistical targets
+
+A linear kernel does not determine how a learner handles censoring.
+`svm` retains its censored absolute-loss regression objective. The additional
+identifiers `svm_rank`, `svm_hybrid` and `svm_ipcw` fit different, explicitly
+specified objectives. They do not replace saved regression results or silently
+choose an objective from the observed test performance. All return risk scores;
+none supplies native survival probabilities or an unrestricted lifetime median.
+
+Write $Y_i=\min(T_i,C_i)$, $\delta_i=I(T_i\le C_i)$, and
+$[a]_+=\max(a,0)$. Larger scores $r_i$ indicate earlier failure.
+Both available kernels use training-only preprocessing. An additive kernel
+allows nonlinear univariate effects but does not introduce interactions.
+
+## Ranking with every comparable pair
+
+For $\mathcal P=\{(i,j):\delta_i=1,Y_i<Y_j\}$, the fitted objective is
+
+$$
+Q(r)=\frac{\lambda}{2}\lVert r\rVert_{\mathcal H}^2+
+\frac{1}{|\mathcal P|}\sum_{(i,j)\in\mathcal P}[1-r_i+r_j]_+^2.
+$$
+
+For the linear kernel, $r(x)=\beta^\top x$. An intercept cancels in every
+comparison and is fixed at zero. All comparable pairs are used, including
+those whose later observation is censored. Equal observed times are excluded;
+no jitter is applied. The margin loss is a convex surrogate, not exact
+maximization of the concordance index.
+Harrell evaluation additionally orders an event before a censoring recorded
+at the same time; the ranking training set excludes this equal-time pair.
+Thus training and evaluation share an orientation, not an identical pair set.
+
+The implementation uses two time-ordered sweeps and Fenwick prefix sums of
+score counts, sums and squared sums. These produce the exact loss and its
+gradient in $O(n\log n)$ time per evaluation, without an explicit pair matrix.
+Scores are centered internally before computing the moments, since a common
+offset cancels from every margin. This prevents cancellation of large offset
+terms without changing the objective or its gradient.
+This is an implementation of established survival-ranking ideas, not a claim
+to a new statistical estimator. Efficient primal survival SVM training was
+studied by [Poelsterl et al. (2015)](https://doi.org/10.1007/978-3-319-23525-7_15).
+
+```{r rank}
+d <- survival::veteran
+f <- Surv(time, status) ~ age + karno
+rank_fit <- surv_fit(f, d, "svm_rank", params = list(lambda = 0.01))
+surv_predict(rank_fit, d[1:4, ])
+rank_fit$engine$diagnostics[c("comparable_pairs", "gradient_norm",
+                            "strong_convexity_gap_bound")]
+```
+
+## Exact additive representation
+
+For distinct training coordinates $u_{j0}<\cdots<u_{jm_j}$ scaled to $[0,1]$,
+let $\theta_{jk}$ be the fitted contribution at a knot, fixing
+$\theta_{j0}=0$. The squared RKHS norm, modulo an unpenalized constant, is
+
+$$
+\lVert r\rVert_{\mathcal H}^2=
+\sum_j\sum_{k=1}^{m_j}
+\frac{(\theta_{jk}-\theta_{j,k-1})^2}{2(u_{jk}-u_{j,k-1})}.
+$$
+
+The reparameterization
+$\theta_{jk}=\sum_{\ell\le k}\sqrt{2(u_{j\ell}-u_{j,\ell-1})}a_{j\ell}$
+turns this penalty into $\sum a_{jk}^2$. Cumulative sums and a sparse
+knot-incidence design implement the transformation and its transpose exactly.
+All training knots remain; this is neither a low-rank approximation nor
+subsampling. Prediction interpolates between knots and remains constant outside
+the training range, as in the original additive kernel's anchored representation.
+For ranking, strong convexity in these coordinates gives
+$Q(a)-Q(a^*)\le\lVert\nabla Q(a)\rVert^2/(2\lambda)$, which is checked
+alongside optimizer convergence. Hybrid and IPCW fits report stationarity;
+they do not claim the same bound for an unpenalized intercept.
+Acceptance requires optimizer success and
+$\|\nabla Q(v)\|\le\texttt{tolerance}\max(1,\|v\|)$, including the intercept
+in $v$ when present. Ranking additionally requires its gap bound to be at most
+$\texttt{tolerance}\max(1,|Q|)$.
+
+```{r additive}
+additive_fit <- surv_fit(f, d, "svm_rank",
+  params = list(kernel = "additive", lambda = 0.01))
+surv_predict(additive_fit, d[1:4, ])
+```
+
+## A hybrid score
+
+Let $s=\max_iY_i$, $z_i=Y_i/s$ and $r_i=f(x_i)+b$. The hybrid minimizes
+
+$$
+\frac{\lambda}{2}\lVert f\rVert_{\mathcal H}^2+
+\eta L_{\rm rank}(r)+\frac{1-\eta}{n}
+\sum_i\left\{\delta_i(r_i+z_i)^2+(1-\delta_i)[r_i+z_i]_+^2\right\},
+\quad 0<\eta<1.
+$$
+
+The negative score has the orientation of a normalized time response.
+Normalization is recomputed in every training fold. The squared regression
+component is explicitly different from the original `svm` absolute loss.
+Ranking-regression hybrids are established methods; their advantage over either
+component must be assessed rather than assumed.
+[Van Belle et al. (2011)](https://doi.org/10.1016/j.artmed.2011.06.006)
+
+```{r hybrid}
+hybrid_fit <- surv_fit(f, d, "svm_hybrid",
+  params = list(kernel = "linear", lambda = 0.01, rank_weight = 0.5))
+surv_predict(hybrid_fit, d[1:4, ])
+```
+
+## IPCW for a restricted response
+
+Choose a horizon $\tau$ before fitting. Define $Z_i=\min(Y_i,\tau)/\tau$ and
+$A_i=I(Y_i\ge\tau)+\delta_i I(Y_i<\tau)$, indicating that the restricted
+outcome is observed. With $G(t^-|x)=P(C\ge t|X=x)$, the objective is
+
+$$
+\frac{\lambda}{2}\lVert f\rVert_{\mathcal H}^2+
+\frac1n\sum_i\frac{A_i}{\widehat G(\min(Y_i,\tau)^-|x_i)}
+\left[|Z_i+r_i|-\epsilon\right]_+^2.
+$$
+
+At $\epsilon=0$ this is weighted kernel ridge regression for a restricted
+mean target, not an absolute-loss median estimator. For positive epsilon it
+is squared epsilon-insensitive SVR; the target should not then be called an
+exact conditional mean. Regularization and a restricted function class still
+distinguish the fitted score from the unrestricted population conditional mean.
+Earlier censored rows inform the censoring model, and every row followed to
+the horizon supplies its observed restricted response.
+The IPCW principle for censored SVM learning is developed by
+[Goldberg and Kosorok](https://arxiv.org/abs/1202.5130).
+
+```{r ipcw}
+ipcw_fit <- surv_fit(f, d, "svm_ipcw",
+  params = list(horizon = 60, lambda = 0.01, epsilon = 0,
+                censoring_method = "km"))
+ipcw_fit$engine$diagnostics$ipcw
+```
+
+The marginal option requires $G(t|X)=G(t)$ as well as conditional independent
+censoring. The Cox option uses the encoded training predictors and requires
+a suitable conditional censoring model. Both require positive support. The
+implementation rejects fitted probabilities below `min_g`, without clipping
+weights. The check includes the horizon for every training row and the time
+of each observed restricted outcome. A positive smooth model prediction cannot establish actual support
+when administrative censoring is deterministic given entry date. No weighting
+method identifies an unobserved lifetime tail. In that setting IPCW results
+must be described as an assumption-dependent sensitivity analysis.
+
+## Selection and numerical checks
+
+```{r tuning}
+plan <- surv_resamples(f, d, folds = 3, seed = 104)
+search <- surv_tune(f, d, "svm_rank",
+  grid = list(kernel = c("linear", "additive"), lambda = c(0.01, 0.1)),
+  resamples = plan, seed = 104)
+search$results[c("kernel", "lambda", "mean_cindex", "failed_folds")]
+```
+
+The existing parallel/checkpoint interface also applies. Cached designs never
+cross analysis folds. IPCW nuisance fits use only each analysis fold. Every
+method retains all rows and the exact declared kernel; failed candidates
+cannot win. The native optimization uses R's L-BFGS-B and the package's compiled
+pair evaluator, with no additional dependency or external runtime.
+A line-search termination may occur at floating-point precision even after
+the requested accuracy has been attained. Such a fit is accepted only if
+the unchanged relative-gradient check and, for ranking, the objective-gap
+bound both pass. Diagnostics distinguish `stationarity_verified` from
+`reported_success` and retain the optimizer's original code and message.
+Iteration-limit exits and other optimizer failures remain ineligible.
+`lambda` and the original regression `cost` are not interchangeable.
+
+The unit tests compare the pair evaluator with full enumeration, check analytic
+gradients by finite differences, compare ranking against an independent
+explicit-pair quadratic program, and exercise serialization, unsupported
+prediction targets, IPCW support and cached/parallel tuning. These checks
+establish implementation consistency, not universal predictive superiority.
+Independent quadratic programs also check the hybrid objective and IPCW with
+positive epsilon; zero-epsilon IPCW is checked against weighted normal equations.

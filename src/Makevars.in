@@ -3,7 +3,7 @@ CXX_STD = CXX17
 PKG_CXXFLAGS = $(CXX_VISIBILITY)
 PKG_CPPFLAGS = -Irsf -Irsf/shared
 PKG_LIBS = @RSF_OPENMP_LINK@ $(LAPACK_LIBS) $(BLAS_LIBS) $(FLIBS)
-OBJECTS = init.o gehan.o \
+OBJECTS = init.o gehan.o svm_rank.o \
   rsf/bootstrap.o rsf/classification.o rsf/diagnostic.o \
   rsf/entryGeneric.o rsf/factorOps.o rsf/importance.o rsf/importanceAnti.o \
   rsf/importancePerm.o rsf/importanceRand.o rsf/impute.o rsf/internal.o rsf/leafLink.o \

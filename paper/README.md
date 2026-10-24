@@ -11,15 +11,16 @@ Pedro Luiz Ramos, Pontificia Universidad Catolica de Chile.
 - [Replication material](Replication_survlearning.zip): R scripts, baseline
   data, results, and the software version used in the numerical study.
 
-The current package is version 0.3.0. It integrates the RF-SRC, Royston-Parmar
-and Gehan fitting components while retaining the method identifiers and
-prediction contracts. Upstream-derived code is credited in `inst/COPYRIGHTS`.
+The article documents version 0.3.4, including native neural Cox estimation,
+integrated RF-SRC, Royston-Parmar and Gehan fitting components, and censored
+regression, ranking, hybrid and censoring-weighted SVM objectives. Upstream-derived
+code is credited in `inst/COPYRIGHTS`.
 
-The accompanying article documents version 0.2.6. The numerical study
-uses the supplied version 0.2.4; its software requirements and execution
-instructions are in `README_REPLICATION.md` inside the replication archive.
-The compatibility comparison reported in the article uses the same fitted
-XGBoost engine and the complete training sample.
+The replication archive supplies version 0.3.4. The computational experiments
+were recorded under development version 0.3.3.9001; the six selected new SVM
+fits were repeated on the complete cohort with 0.3.4, reproducing their
+reported C-indices. Timing results retain their original software labels.
+Requirements and execution instructions are in `README_REPLICATION.md`.
 
 The application includes 29,058 eligible drives and 718 failures. The predictive
 comparison uses 23,246 training drives and 5,812 held-out drives. The historical

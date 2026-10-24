@@ -18,6 +18,7 @@ jobs:
           - {os: macos-latest, r: release}
           - {os: macos-15-intel, r: release}
           - {os: ubuntu-latest, r: devel}
+          - {os: windows-latest, r: devel}
     env:
       R_KEEP_PKG_SOURCE: yes
       OMP_NUM_THREADS: 2
@@ -45,8 +46,10 @@ jobs:
           _R_CHECK_CRAN_INCOMING_: false
           _R_CHECK_FORCE_SUGGESTS_: true
         run: |
-          archive <- "artifacts/survlearning_0.3.0.tar.gz"
+          archive <- "artifacts/survlearning_0.3.4.tar.gz"
           stopifnot(file.exists(archive))
+          stopifnot(read.dcf("DESCRIPTION")[1, "Version"] == "0.3.4")
+          stopifnot(unname(tools::md5sum(archive)) == "13b2a845992c9154bbfbebb7eecf75ad")
           print(tools::md5sum(archive))
           rcmdcheck::rcmdcheck(path = archive,
             args = c("--no-manual", "--as-cran", "--run-donttest"),
@@ -54,3 +57,8 @@ jobs:
           tests <- "check/survlearning.Rcheck/tests/testthat.Rout"
           stopifnot(file.exists(tests))
           cat(readLines(tests), sep = "\n")
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: check-${{ matrix.os }}-${{ matrix.r }}
+          path: check

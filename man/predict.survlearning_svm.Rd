@@ -19,7 +19,7 @@ predictors, with the training column names and at least one row.}
 A list with numeric vector `predicted`, one value per row. These
   censored-regression scores are not calibrated survival times. Their negative
   is the package's increasing-risk score. Missing/invalid columns cause errors.
-  Saved engines explicitly marked as infeasible or failed are rejected.
+  Failed engines and engines from the former conditioned QP require refitting.
 }
 \description{
 Predict Encoded Censored SVM Responses

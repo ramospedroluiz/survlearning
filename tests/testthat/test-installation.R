@@ -3,7 +3,7 @@ test_that("all supported engines and solvers are required dependencies", {
   imports <- tools::package_dependencies("survlearning", db = metadata,
     which = "Imports")[["survlearning"]]
   engines <- unique(vapply(survlearning:::.method_specs(), `[[`, "", "engine"))
-  solvers <- c("Matrix", "quadprog", "osqp", "clarabel", "RSpectra")
+  solvers <- c("Matrix", "quadprog", "osqp", "clarabel")
   required <- setdiff(unique(c(engines, solvers, "splines", "withr", "Rcpp", "irlba")), "survlearning")
   expect_true(all(required %in% imports))
   expect_true(all(surv_methods()$installed))

@@ -7,7 +7,10 @@
 #' @param ... Reserved for S3 compatibility; extra arguments are rejected.
 #' @details
 #' Risk scores always increase with risk. AFT scores are negative log-time
-#' predictors; SVM scores are negative predicted responses. RSF mortality
+#' predictors; the original SVM scores are negative predicted responses.
+#' svm_rank returns its learned risk margin; svm_hybrid and svm_ipcw return
+#' negative normalized regression responses. These are risk-only capabilities.
+#' RSF mortality
 #' scores are not probabilities. Absolute scales must not be compared
 #' between methods.
 #' XGBoost Cox returns its log-risk margin, whereas XGBoost AFT returns the
@@ -66,7 +69,7 @@ surv_predict <- function(object, newdata, type = "risk", times = NULL) {
     stop("'times' is only used with type = 'survival'.", call. = FALSE)
   }
   x <- .new_design(object$design, newdata)
-  if (object$method %in% c("aft_lasso", "aft_ridge", "aft_elasticnet", "svm", "mtlr")) {
+  if (object$method %in% c("aft_lasso", "aft_ridge", "aft_elasticnet", "svm", "mtlr", .svm_learning_methods())) {
     x <- .scaled_design(x, object$design)
   }
   if (type == "survival") {
@@ -88,6 +91,7 @@ surv_predict <- function(object, newdata, type = "risk", times = NULL) {
     return(as.numeric(stats::predict(object$engine, newdata = .engine_data(x),
       type = "quantile", p = 0.5)))
   }
+  if (object$method %in% .svm_learning_methods()) return(.svm_learning_predict(object$engine, x))
   result <- switch(object$method,
     aft = -stats::predict(object$engine, newdata = .engine_data(x), type = "lp"),
     aft_lasso = , aft_ridge = , aft_elasticnet = {

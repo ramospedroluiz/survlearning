@@ -6,7 +6,7 @@ f <- Surv(time, status) ~ age + karno
 train <- d[1:100, ]
 test <- d[101:nrow(d), ]
 fit <- surv_fit(f, train, "svm", list(kernel = "additive",
-  solver = "newton", cost = .1), seed = 20261023)
+  solver = "clarabel", cost = .1), seed = 20261023)
 surv_diagnostics(fit)
 surv_score(fit, test)
 surv_predict(fit, test[1, ])

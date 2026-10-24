@@ -26,7 +26,7 @@ Torch nor Python. The package is not yet on CRAN.
 For a downloaded source archive, use an installer that resolves dependencies:
 
 ```r
-remotes::install_local("survlearning_0.3.0.tar.gz", dependencies = NA)
+remotes::install_local("survlearning_0.3.4.tar.gz", dependencies = NA)
 ```
 
 Base R's `install.packages(..., repos = NULL)` installs a local archive but does
@@ -90,6 +90,29 @@ an explicit `seed` to resume an identical search. A checkpoint belongs to one
 live search; changed data, settings, or software versions invalidate it.
 Workers duplicate data and may increase memory requirements.
 
+## Survival SVM objectives
+
+Version 0.3.4 includes `svm_rank`, `svm_hybrid`, and `svm_ipcw`. The original
+`svm` identifier retains censored absolute-loss regression. Each new objective
+supports linear and exact additive kernels, without subsampling, Python,
+Torch or new dependencies. Ranking uses all strictly time-ordered comparable
+pairs without allocating their pair matrix.
+
+```r
+ranking <- surv_tune(f, train, method = "svm_rank",
+  grid = list(kernel = c("linear", "additive"), lambda = c(0.001, 0.01, 0.1)),
+  folds = 3, seed = 104)
+surv_predict(ranking, test, type = "risk")
+```
+
+`svm_hybrid` combines squared ranking and censored-regression losses through
+`rank_weight`. `svm_ipcw` requires an explicit `horizon` and valid censoring
+weights for a restricted response. At `epsilon = 0` its squared loss gives
+weighted kernel ridge regression. All three expose risk scores only.
+See `vignette("svm-learning", package = "survlearning")` for the objectives,
+support assumptions, numerical checks and complete examples. None is claimed
+to dominate other survival learners or identify an unobserved lifetime tail.
+
 ## Evaluate predictions
 
 ```r
@@ -149,19 +172,20 @@ horizon; quantiles not reached on the prediction grid are returned as `NA`.
 | `xgboost_cox` | xgboost | risk, survival |
 | `xgboost_aft` | xgboost | risk, median, survival |
 | `mtlr` | MTLR | risk, survival |
-| `svm` | native R; Clarabel, OSQP, quadprog, or Newton | risk |
+| `svm` | native sparse primal; Clarabel or OSQP | risk |
+| `svm_rank`, `svm_hybrid`, `svm_ipcw` | native pair evaluation and L-BFGS-B | risk |
 | `flexsurv` | integrated Royston-Parmar | risk, survival |
 | `neural_cox` | native R | risk, survival |
 | `neural_discrete` | nnet | risk, survival |
 
-The 23 identifiers include alternative penalties and engines, not 23 unrelated
+The 26 identifiers include alternative penalties and engines, not 26 unrelated
 statistical families. Penalized AFT uses Gehan loss. The `rpart` tree uses
 exponential deviance. Neural Cox retains proportional hazards and supports
 Efron and Breslow ties. Censored SVM uses linear or additive kernels and keeps
-the complete training sample. Its default compact solver is `clarabel`;
-linear `solver = "newton"` uses base R optimization, while compact additive
-fitting uses `RSpectra`. All supported solver packages are installed together
-with `survlearning`.
+the complete training sample. Its exact sparse primal uses `clarabel` by default,
+with `osqp` as an alternative. Additive ranges are fixed in training. A documented
+training-fixed prediction resolution prevents numerical near ties from creating
+artificial risk ordering. All supported solvers are installed with `survlearning`.
 
 ## Documentation
 

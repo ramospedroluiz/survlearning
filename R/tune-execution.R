@@ -100,7 +100,7 @@
   on.exit(if (!success) .tune_unlock(state), add = TRUE)
   saveRDS(state$token, file.path(lock, "owner.rds"))
   dependencies <- unique(c("survlearning", "survival", .method_specs()[[context$method]]$engine,
-    if (context$method == "svm") c("Matrix", "RSpectra", "quadprog", "clarabel", "osqp")))
+    if (context$method == "svm") c("Matrix", "clarabel", "osqp")))
   versions <- stats::setNames(vapply(dependencies, function(package) {
     tryCatch(as.character(utils::packageVersion(package)), error = function(e) "not_installed")
   }, character(1)), dependencies)

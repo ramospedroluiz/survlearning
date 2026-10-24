@@ -1,7 +1,7 @@
 Package: survlearning
 Type: Package
 Title: Unified Statistical Learning for Survival and Reliability
-Version: 0.3.0
+Version: 0.3.4
 Authors@R: c(person("Pedro Luiz", "Ramos", email = "pedro.ramos@uc.cl",
     role = c("aut", "cre")),
     person("Hemant", "Ishwaran", role = "ctb", comment = "Included RF-SRC code"),
@@ -22,12 +22,12 @@ URL: https://github.com/ramospedroluiz/survlearning
 BugReports: https://github.com/ramospedroluiz/survlearning/issues
 Encoding: UTF-8
 Depends: R (>= 4.3.0)
-Imports: stats, survival, graphics, utils, parallel, tools, withr (>= 2.5.0),
+Imports: stats, survival, graphics, utils, methods, parallel, tools, withr (>= 2.5.0),
     glmnet (>= 5.0), rpart, gbm, Rcpp, irlba,
     xgboost (>= 3.0.0), MTLR (>= 0.2.2),
     CoxBoost, ranger, aorsf, splines,
     nnet,
-    Matrix, quadprog, osqp (>= 1.0.0), clarabel (>= 0.11.3), RSpectra
+    Matrix, quadprog, osqp (>= 1.0.0), clarabel (>= 0.11.3)
 Suggests: survivalsvm, randomForestSRC, flexsurv, penAFT, testthat (>= 3.1.8), knitr, rmarkdown, callr, pkgload
 LinkingTo: Rcpp, RcppArmadillo
 SystemRequirements: OpenMP (optional)

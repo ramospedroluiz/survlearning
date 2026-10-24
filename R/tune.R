@@ -12,14 +12,14 @@
 #' @param times Evaluation horizons. Time-specific tuning requires one horizon.
 #' @param tau Truncation horizon passed to [surv_evaluate()].
 #' @param impute `"none"` or `"median"`, learned within every training fit.
-#' @param cache Reuse SVM preprocessing, repaired Hessians and solver workspaces
+#' @param cache Reuse SVM preprocessing, sparse penalties and constraint matrices
 #'   within each analysis split and kernel (default TRUE). Never shared across
 #'   splits; at most one kernel workspace is retained. FALSE provides a cold
 #'   reference path. Other methods are unaffected.
 #' @param censoring NULL for marginal IPCW, or a formula/list specification
 #'   refitted by [surv_censor_fit()] on each analysis fold. Never a global fit.
 #' @param workers Number of local PSOCK workers. Default 1 is serial. Work is
-#'   grouped by analysis fold, retaining within-fold SVM factor/workspace reuse.
+#'   grouped by analysis fold, retaining within-fold SVM matrix reuse.
 #' @param checkpoint NULL, or a directory owned by this search. Individual
 #'   candidate-fold records are committed atomically; no fold models are stored.
 #' @param resume Reuse compatible completed records (default TRUE).
@@ -122,7 +122,7 @@ surv_tune <- function(formula, data, method = "cox", grid = NULL, params = list(
     }
   }
   jobs <- expand.grid(fold = seq_along(resamples$splits), candidate = seq_len(nrow(grid)))
-  shared <- method == "svm" && cache
+  shared <- method %in% c("svm", .svm_learning_methods()) && cache
   groups <- rep("", nrow(grid))
   if (shared) groups <- vapply(seq_len(nrow(grid)), function(i) {
     setting <- .tune_setting(params, grid, i)

@@ -22,3 +22,7 @@
 ^artifacts$
 ^src/.*\.(o|dll|so|a)$
 ^src/Makevars$
+^SVM_learning_study(\.zip)?$
+^SVM_reference_audit\.(pdf|zip)$
+^CRAN_submission_.*$
+^Rplots\.pdf$

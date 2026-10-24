@@ -59,7 +59,7 @@ concordance and AUC are maximized.}
 
 \item{impute}{`"none"` or `"median"`, learned within every training fit.}
 
-\item{cache}{Reuse SVM preprocessing, repaired Hessians and solver workspaces
+\item{cache}{Reuse SVM preprocessing, sparse penalties and constraint matrices
 within each analysis split and kernel (default TRUE). Never shared across
 splits; at most one kernel workspace is retained. FALSE provides a cold
 reference path. Other methods are unaffected.}
@@ -68,7 +68,7 @@ reference path. Other methods are unaffected.}
 refitted by [surv_censor_fit()] on each analysis fold. Never a global fit.}
 
 \item{workers}{Number of local PSOCK workers. Default 1 is serial. Work is
-grouped by analysis fold, retaining within-fold SVM factor/workspace reuse.}
+grouped by analysis fold, retaining within-fold SVM matrix reuse.}
 
 \item{checkpoint}{NULL, or a directory owned by this search. Individual
 candidate-fold records are committed atomically; no fold models are stored.}

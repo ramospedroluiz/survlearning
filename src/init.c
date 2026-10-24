@@ -3,6 +3,7 @@
 #include <R_ext/Rdynload.h>
 #include <R_ext/Visibility.h>
 extern SEXP sl_gehan_fit(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
+extern SEXP sl_svm_rank(SEXP, SEXP, SEXP);
 
 extern SEXP sl_rfsrcCIndex(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP sl_rfsrcCIndexFenwick(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
@@ -20,6 +21,7 @@ extern SEXP sl_rfsrcPredict(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP
     SEXP, SEXP, SEXP);
 
 static const R_CallMethodDef CallEntries[] = {
+    {"sl_svm_rank", (DL_FUNC) &sl_svm_rank, 3},
     {"sl_gehan_fit", (DL_FUNC) &sl_gehan_fit, 8},
     {"sl_rfsrcCIndex", (DL_FUNC) &sl_rfsrcCIndex, 8},
     {"sl_rfsrcCIndexFenwick", (DL_FUNC) &sl_rfsrcCIndexFenwick, 8},

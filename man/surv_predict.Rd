@@ -41,7 +41,10 @@ Predict From a Survival Learning Model
 }
 \details{
 Risk scores always increase with risk. AFT scores are negative log-time
-predictors; SVM scores are negative predicted responses. RSF mortality
+predictors; the original SVM scores are negative predicted responses.
+svm_rank returns its learned risk margin; svm_hybrid and svm_ipcw return
+negative normalized regression responses. These are risk-only capabilities.
+RSF mortality
 scores are not probabilities. Absolute scales must not be compared
 between methods.
 XGBoost Cox returns its log-risk margin, whereas XGBoost AFT returns the

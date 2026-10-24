@@ -3,7 +3,9 @@
 #' All methods use the same formula and training-only predictor encoding.
 #' Missing values cause an error by default. Optional median/mode imputation
 #' is learned on training predictors only; outcomes are never imputed.
-#' The SVM always uses censored regression, without automatic subsampling.
+#' `svm` retains censored absolute-loss regression. Separate `svm_rank`,
+#' `svm_hybrid`, and `svm_ipcw` methods have explicitly different objectives.
+#' None uses automatic subsampling.
 #'
 #' @param formula A formula such as `Surv(time, event) ~ temperature + age`.
 #'   Events must be coded 1 and right-censoring 0; times must be positive.
@@ -26,33 +28,71 @@
 #' (square root of the encoded predictor count), `min_node` (15), `splits`
 #' (5), `threads` (1); `boosting`: `trees` (300), `depth` (2),
 #' `learning_rate` (0.03), `min_node` (10), `bag_fraction` (0.7);
-#' `svm`: `cost` (0.1, maps to the engine's `gamma.mu`) and `kernel`
-#' (`"linear"` or `"additive"`), `solver` (`"clarabel"`, default; or
-#' `"osqp"`/`"quadprog"`/`"newton"` for either kernel), `tolerance` (1e-8),
-#' `max_iter` (100000), and `memory_limit_mb` (2048, a workspace planning
-#' limit in MiB, not measured peak memory); `collapse_duplicates` (TRUE)
-#' enables exact multiplicity algebra for compact additive fits, not subsampling.
-#' Unknown parameters cause an error.
-#' Compact solvers require osqp >= 1.0.0 or clarabel >= 0.11.3 respectively.
-#' They preserve the regression QP's nearPD-adjusted Hessian, not a new kernel
-#' approximation. Linear kernels use a thin factorization; additive kernels
-#' additionally require RSpectra for adaptive matrix-free eigendecomposition.
-#' The reference's own 1e-6 spectral cutoff is unchanged; incomplete or ambiguous
-#' eigensystems raise errors. No rows are removed or kernels substituted.
-#' Exact duplicate keys include encoded predictors, observed time and event.
-#' Multiplicities enter the kernel operator, objective, equality and bounds;
-#' all original dual coefficients are reconstructed before support rounding.
-#' Set collapse_duplicates = FALSE for an uncollapsed numerical audit.
-#' OSQP/Clarabel must report full convergence; reduced-accuracy statuses are rejected.
-#' Newton uses stats::nlm on an equivalent box-eliminated dual, with analytic
-#' derivatives, an equality root solve and an independent primal-dual certificate.
-#' The historical quadprog path does not report convergence; feasibility alone
-#' does not establish optimality.
-#' Constraint violations are exposed in diagnostics and exclude tuning fits.
-#' Historical quadprog results may fail this new numerical check. The legacy
-#' five-decimal support/intercept convention is retained: numerical differences
-#' in the support set can shift all risk scores by a constant. SVM scores are
+#' `svm`: `cost` (0.1), `kernel` (`"linear"` or `"additive"`),
+#' `solver` (`"clarabel"`, default, or `"osqp"`), `tolerance` (1e-12),
+#' `max_iter` (100000), `memory_limit_mb` (2048 MiB workspace planning limit,
+#' not measured peak memory), and `prediction_tolerance` (1e-8).
+#' The exact censored absolute-loss primal uses all training rows. The additive
+#' representation retains every distinct training coordinate and fixes ranges
+#' in training. No nearPD projection, spectral truncation or subsampling is used.
+#' Solver success, primal/dual feasibility and an independent objective gap
+#' are checked before returning a model. Legacy Newton/quadprog fits targeted
+#' a different conditioned quadratic program and must be refitted.
+#' Predictions are placed on a training-fixed numerical grid of width
+#' prediction_tolerance times the maximum training follow-up, preventing
+#' solver-scale near ties from producing artificial risk ordering. Set this
+#' parameter to zero to inspect raw scores; it does not change fitting.
+#' `collapse_duplicates` is accepted for compatibility and has no effect:
+#' all observations have individual loss constraints. Cost must be tuned
+#' separately for each kernel, without using test outcomes. SVM scores are
 #' not calibrated times or probabilities. See the SVM optimization vignette.
+#'
+#' `svm_rank`, `svm_hybrid`, and `svm_ipcw` use native R/C++ with no additional
+#' dependencies: `lambda` (0.01), `kernel` (`"linear"` or `"additive"`),
+#' `tolerance` (1e-6), `max_iter` (2000), `memory_limit_mb` (2048), and
+#' `prediction_tolerance` (1e-8 in dimensionless score units; zero disables it).
+#' These lambdas multiply half the squared RKHS norm; losses are averaged,
+#' so their scale is not the original svm cost. Ranking uses every pair with
+#' an observed earlier failure and strictly larger later follow-up, excluding
+#' tied times. A native Fenwick calculation evaluates the exact squared-hinge
+#' objective/gradient without storing all pairs. The pair evaluator
+#' centers scores internally to avoid cancellation of a common
+#' offset; this does not change the fitted objective or prediction orientation.
+#' Harrell evaluation also admits event/censoring ties in recorded time, unlike
+#' the strict ranking training pairs. The additive representation
+#' retains every distinct training coordinate. L-BFGS-B fits are checked for
+#' stationarity; ranking also reports a strong-convexity objective-gap bound.
+#' A line-search termination is accepted only when these same accuracy checks
+#' pass. It is labeled `stationarity_verified`, with the original optimizer
+#' code and message retained; iteration-limit and other failures are rejected.
+#' Stationarity means the Euclidean gradient norm is at most tolerance times
+#' max(1, parameter norm). Ranking also requires its gap bound to be at most
+#' tolerance times max(1, absolute objective). Optimizer success is required.
+#' `svm_hybrid` adds `rank_weight` (0.5, strictly between zero and one), mixing
+#' mean pair loss with mean squared one-sided censored-regression loss.
+#' Regression times are divided by maximum training follow-up; risk is the
+#' negative normalized regression response. This is not the absolute-loss svm.
+#'
+#' `svm_ipcw` requires an explicit positive `horizon` in the outcome time unit.
+#' It fits the restricted outcome min(T,horizon)/horizon with squared
+#' epsilon-insensitive loss: `epsilon` (0), `censoring_method` (`"km"`, default,
+#' or `"cox"`), and `min_g` (0.05). At epsilon zero it is weighted kernel ridge
+#' regression, not sparse epsilon-insensitive absolute-loss SVR. The censoring
+#' model is refitted inside each training split using the encoded predictors
+#' for Cox. Failures before the horizon and all rows followed to the horizon
+#' have observed restricted outcomes; earlier censorings inform G. Weights use
+#' G(min(Y,horizon)-). Insufficient fitted support raises an error, never clips
+#' weights or drops rows. KM needs marginal censoring assumptions; Cox needs a
+#' valid conditional PH model. Both require conditional independent censoring
+#' and positivity. A smooth Cox G does not repair deterministic administrative
+#' support failure. Empirical support is checked at the horizon for every
+#' training row as well as at each observed restricted response; finite fitted
+#' probabilities alone do not verify population positivity. At epsilon zero,
+#' the unpenalized unrestricted population target is the negative normalized
+#' restricted mean, but a penalized fitted score is not an unbiased mean estimate.
+#' All three methods return risk only, not calibrated survival
+#' probabilities or unrestricted lifetime estimates. See the survival SVM
+#' learning vignette for objectives, assumptions and examples.
 #'
 #' `aft_elasticnet` and `cox_elasticnet` add `alpha` (0.5) to their
 #' respective penalized AFT/Cox parameters: 1 is LASSO, 0 is ridge.
@@ -67,6 +107,8 @@
 #' are standardized using training means and standard deviations for SVM
 #' penalized AFT, and MTLR. Other engines receive the unscaled design; glmnet
 #' performs its own training-only standardization.
+#' Penalized Cox follows a descending regularization path ending at the exact
+#' requested lambda, rather than fitting a weak-penalty cold start in isolation.
 #'
 #' Penalized AFT uses the Gehan loss and an integrated ADMM solver adapted from
 #' penAFT. It returns a relative risk ordering,
@@ -178,7 +220,7 @@ surv_fit <- function(formula, data, method = "cox", params = list(), seed = NULL
     out$diagnostics$engine_details <- engine$diagnostics
     if (method == "neural_discrete") out$diagnostics$coarsening <- engine$coarsening
   }
-  if (method == "svm") out$diagnostics$engine_details <- engine$diagnostics
+  if (method %in% c("svm", .svm_learning_methods())) out$diagnostics$engine_details <- engine$diagnostics
   if (method %in% c("aft_lasso", "aft_ridge", "aft_elasticnet", "flexsurv")) {
     out$diagnostics$engine_details <- engine$diagnostics
   }
@@ -191,11 +233,12 @@ surv_fit <- function(formula, data, method = "cox", params = list(), seed = NULL
   }
   x <- prepared$x
   y <- prepared$y
-  if (method %in% c("aft_lasso", "aft_ridge", "aft_elasticnet", "svm", "mtlr")) {
+  if (method %in% c("aft_lasso", "aft_ridge", "aft_elasticnet", "svm", "mtlr", .svm_learning_methods())) {
     x <- .scaled_design(x, prepared$design)
   }
   data <- .engine_data(x, y)
   formula <- .engine_formula()
+  if (method %in% .svm_learning_methods()) return(.svm_learning_fit(method, x, y, params, svm_cache))
   switch(method,
     aft = survival::survreg(formula, data = data, dist = params$distribution),
     aft_lasso = , aft_ridge = , aft_elasticnet = {
@@ -204,9 +247,8 @@ surv_fit <- function(formula, data, method = "cox", params = list(), seed = NULL
     },
     cox = survival::coxph(formula, data = data, ties = "efron", x = TRUE, y = TRUE),
     cox_lasso = , cox_ridge = , cox_elasticnet = {
-      glmnet::glmnet(.glmnet_design(x), y, family = "cox",
-        alpha = if (method == "cox_elasticnet") params$alpha else as.integer(method == "cox_lasso"),
-        lambda = params$lambda, standardize = TRUE, cox.ties = "breslow")
+      .fit_penalized_cox(.glmnet_design(x), y, params$lambda,
+        if (method == "cox_elasticnet") params$alpha else as.integer(method == "cox_lasso"))
     },
     tree = rpart::rpart(formula, data = data, method = "exp",
       control = rpart::rpart.control(cp = params$cp, minbucket = params$min_node,
@@ -229,6 +271,10 @@ surv_fit <- function(formula, data, method = "cox", params = list(), seed = NULL
 }
 
 .engine_convergence <- function(engine) {
+  if (inherits(engine, "survlearning_svm_learning")) {
+    return(list(status = engine$diagnostics$status,
+      code = engine$diagnostics$optimizer_status))
+  }
   if (is.list(engine) && is.list(engine$opt) &&
       is.numeric(engine$opt$convergence) && length(engine$opt$convergence) == 1L) {
     return(list(status = if (engine$opt$convergence == 0) "reported_success" else "reported_failure",
