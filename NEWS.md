@@ -1,3 +1,30 @@
+# survlearning 0.3.5
+
+* Add methodological references to DESCRIPTION and make RSF diagnostics
+  suppressible, preserving native error conditions without console printing.
+* Match the integrated RSF seed protocol in upstream equivalence tests when
+  randomForestSRC >= 3.10.0 is installed, restoring its previous RNG option.
+
+* Add paired test-case percentile intervals to surv_compare(), using common
+  assessment resamples and a shared censoring reference.
+* Add IPCW calibration intercept and slope through surv_calibrate(type =
+  "metrics"), with fixed-model bootstrap intervals and explicit diagnostics.
+* Add surv_stack(): convex native-survival mixtures with out-of-fold Brier
+  weight estimation, fold-local preprocessing/censoring, nested base-model
+  tuning and full-data refitting. No new dependencies are required.
+
+* Reject unidentified or nonconverged parametric AFT fits and invalid native
+  predictions instead of returning silent missing values.
+* Standardize Royston-Parmar predictors within training, use analytic gradients
+  on every link scale, and verify baseline monotonicity between knots and in
+  both tails. Invalid distributions are rejected without clipping curves.
+* Initialize XGBoost AFT on a training-derived log-time scale so that changing
+  the outcome unit does not materially change finite-iteration predictions.
+* Initialize CoxBoost penalties correctly for single-predictor designs using
+  a zero-effect auxiliary column.
+* Diagnose constant censored-SVM training scores explicitly. Preserve the
+  fitted objective and distinguish lack of discrimination from solver failure.
+
 # survlearning 0.3.4
 
 * Distinguish an accuracy-verified line-search termination from optimizer

@@ -44,6 +44,11 @@ A `survlearning_fit` object with engine, parameters, design, and
   Kaplan-Meier accepts fully censored training outcomes and returns survival
   one within observed support; regression engines require an observed failure.
   Invalid inputs or unavailable required dependencies cause informative errors.
+  Unpenalized AFT rejects rank-deficient designs and reported nonconvergence,
+  rather than returning unidentified coefficients. Royston-Parmar checks
+  the baseline spline's slope throughout its domain, including between knots.
+  An invalid fitted distribution is rejected; curves are never repaired by
+  clipping or by silently reducing the number of knots.
   No files are written and no dependencies are installed automatically.
 }
 \description{
@@ -77,6 +82,10 @@ Predictions are placed on a training-fixed numerical grid of width
 prediction_tolerance times the maximum training follow-up, preventing
 solver-scale near ties from producing artificial risk ordering. Set this
 parameter to zero to inspect raw scores; it does not change fitting.
+A constant training score is reported explicitly in diagnostics and a warning.
+This can be a valid optimum of censored absolute loss, not a solver failure;
+it provides no learned risk discrimination. No alternative objective is selected
+automatically. Ranking and hybrid methods remain explicit choices.
 `collapse_duplicates` is accepted for compatibility and has no effect:
 all observations have individual loss constraints. Cost must be tuned
 separately for each kernel, without using test outcomes. SVM scores are
@@ -98,7 +107,7 @@ the strict ranking training pairs. The additive representation
 retains every distinct training coordinate. L-BFGS-B fits are checked for
 stationarity; ranking also reports a strong-convexity objective-gap bound.
 A line-search termination is accepted only when these same accuracy checks
-pass. It is labeled \code{stationarity_verified}, with the original optimizer
+pass. It is labeled `stationarity_verified`, with the original optimizer
 code and message retained; iteration-limit and other failures are rejected.
 Stationarity means the Euclidean gradient norm is at most tolerance times
 max(1, parameter norm). Ranking also requires its gap bound to be at most
@@ -140,7 +149,7 @@ distribution of log-time. `mtlr` accepts `intervals` (10), `lambda`
 
 Factors are encoded consistently with training. Numeric design columns
 are standardized using training means and standard deviations for SVM
-penalized AFT, and MTLR. Other engines receive the unscaled design; glmnet
+penalized AFT, MTLR, and Royston-Parmar. Other engines receive the unscaled design; glmnet
 performs its own training-only standardization.
 Penalized Cox follows a descending regularization path ending at the exact
 requested lambda, rather than fitting a weak-penalty cold start in isolation.
@@ -155,6 +164,10 @@ Reference parameters: `km` has no parameters and ignores the formula's
 predictors; `cox_spline` uses `df` (3) for natural splines of continuous
 design columns; `flexsurv` uses `knots` (1) and `scale` (`"hazard"`,
 `"odds"` or `"normal"`); `coxboost` uses `steps` (100) and `penalty` (100).
+Royston-Parmar stores its optimizer coefficients in training-standardized
+coordinates together with their transformation. CoxBoost uses a zero-effect
+auxiliary column for single-predictor designs to initialize the upstream
+scalar penalty correctly; the fitted method and observations are unchanged.
 `ranger` uses `trees` (200), `mtry` (square root of predictor count),
 `min_node` (15) and `threads` (1). `aorsf` uses the same forest arguments
 with `min_node` (5) and `splits` (5), specifying oblique rather than axis
@@ -179,7 +192,10 @@ their failure interval. This explicit discretization loses partial-interval
 information, rather than inventing survival until the next grid endpoint.
 XGBoost Cox uses signed time labels for censoring and an explicitly
 estimated training-only Breslow baseline. XGBoost AFT uses lower/upper
-censoring bounds, not ordinary regression on censored times. MTLR knots
+censoring bounds, not ordinary regression on censored times. Its initial
+log-location is the training mean log-follow-up, so initialization respects
+changes in the outcome time unit. This is a starting value, not an estimate
+of mean lifetime. MTLR knots
 and scaling are learned within training, including each tuning fold.
 }
 \examples{

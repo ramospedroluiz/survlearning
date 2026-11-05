@@ -77,14 +77,26 @@
       if (length(unique(y[y[, 2L] == 1, 1L])) < params$knots + 2L) {
         stop("Royston-Parmar requires at least knots + 2 distinct event times.", call. = FALSE)
       }
-      .fit_rp(x, y, params)
+      moments <- .design_moments(x)
+      fit <- .fit_rp(.scaled_design(x, moments), y, params)
+      fit$predictor_scaling <- moments
+      fit
     },
     coxboost = {
       .integer_scalar(params$steps, "steps", 1L)
       .positive_scalar(params$penalty, "penalty")
-      CoxBoost::CoxBoost(time = y[, 1L], status = y[, 2L], x = x,
+      # Some CoxBoost versions omit the penalty when length(penalty) == p.
+      # A zero-effect column ensures scalar penalty expansion for p = 1.
+      padded <- ncol(x) == 1L
+      engine_x <- if (padded) cbind(x, .sl_padding = 0) else x
+      fit <- CoxBoost::CoxBoost(time = y[, 1L], status = y[, 2L], x = engine_x,
         stepno = params$steps, penalty = params$penalty, standardize = TRUE,
         trace = FALSE)
+      fit$.sl_padding <- padded
+      if (any(!is.finite(fit$coefficients))) {
+        stop("CoxBoost returned non-finite coefficients; no fitted model was returned.", call. = FALSE)
+      }
+      fit
     },
     ranger = {
       params <- .reference_forest_params(params, ncol(x))
@@ -111,6 +123,7 @@
     return(.predict_neural(object, x, type, times))
   }
   fit <- object$engine
+  if (method == "coxboost" && isTRUE(fit$.sl_padding)) x <- cbind(x, .sl_padding = 0)
   n <- nrow(x)
   new <- .engine_data(x)
   if (type == "risk") {
@@ -118,8 +131,7 @@
       km = rep(0, n),
       cox_spline = stats::predict(fit, newdata = new, type = "lp", reference = "zero"),
       flexsurv = {
-        beta <- .rp_coefficients(fit)[colnames(x)]
-        drop(x %*% beta)
+        .rp_risk(fit, x)
       },
       coxboost = stats::predict(fit, newdata = x, at.step = object$params$steps, type = "lp"),
       ranger = rowSums(.reference_ranger_prediction(object, new)$chf),

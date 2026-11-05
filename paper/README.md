@@ -11,16 +11,18 @@ Pedro Luiz Ramos, Pontificia Universidad Catolica de Chile.
 - [Replication material](Replication_survlearning.zip): R scripts, baseline
   data, results, and the software version used in the numerical study.
 
-The article documents version 0.3.4, including native neural Cox estimation,
+The article documents version 0.3.5, including native neural Cox estimation,
 integrated RF-SRC, Royston-Parmar and Gehan fitting components, and censored
-regression, ranking, hybrid and censoring-weighted SVM objectives. Upstream-derived
-code is credited in `inst/COPYRIGHTS`.
+regression, ranking, hybrid and censoring-weighted SVM objectives. It also covers
+paired comparison intervals, IPCW calibration and cross-validated survival
+stacking. The article has 45 pages, including references and the appendix.
+Upstream-derived code is credited in `inst/COPYRIGHTS`.
 
-The replication archive supplies version 0.3.4. The computational experiments
-were recorded under development version 0.3.3.9001; the six selected new SVM
-fits were repeated on the complete cohort with 0.3.4, reproducing their
-reported C-indices. Timing results retain their original software labels.
-Requirements and execution instructions are in `README_REPLICATION.md`.
+The replication archive pins the 0.3.5 source used for the complete numerical
+study, and `code.R` verifies its checksum. The CRAN resubmission uses the same
+numerical engines, with corrections to metadata, diagnostic handling and
+upstream-comparison test compatibility. Requirements and execution instructions
+are in `README_REPLICATION.md`.
 
 The application includes 29,058 eligible drives and 718 failures. The predictive
 comparison uses 23,246 training drives and 5,812 held-out drives. The historical

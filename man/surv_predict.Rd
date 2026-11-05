@@ -71,6 +71,10 @@ NA beyond training follow-up. Kaplan-Meier returns identical curves for
 all rows and constant zero risk. PLANN survival is a step function on its
 training interval endpoints; its risk is negative restricted mean on that
 same grid. Neural Cox returns log hazard with a training-only baseline.
+Predictions are checked for finite values, valid probability bounds and
+nonincreasing survival over the requested supported horizons. An invalid
+curve raises an error rather than being silently clipped or repaired.
+Fits whose optimizer explicitly reported failure cannot be used for prediction.
 }
 \examples{
 fit <- surv_fit(survival::Surv(time, status) ~ age + karno,

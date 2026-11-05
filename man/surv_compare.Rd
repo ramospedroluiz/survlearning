@@ -4,7 +4,15 @@
 \alias{surv_compare}
 \title{Compare Models on the Same Held-Out Observations}
 \usage{
-surv_compare(models, newdata, ...)
+surv_compare(
+  models,
+  newdata,
+  ...,
+  reference = NULL,
+  n_boot = 0L,
+  conf_level = 0.95,
+  seed = NULL
+)
 }
 \arguments{
 \item{models}{A named list of fitted or tuned models. Models must use the
@@ -13,18 +21,38 @@ same response expression and must not have been selected using `newdata`.}
 \item{newdata}{A common held-out data frame.}
 
 \item{...}{Evaluation arguments passed to [surv_evaluate()].}
+
+\item{reference}{Optional name in `models`. If supplied, return each other
+model minus this reference instead of separate model evaluations.}
+
+\item{n_boot}{Number of paired test-case bootstrap repetitions. Use zero
+for point estimates or at least two; several hundred are usually needed.}
+
+\item{conf_level}{Confidence level for percentile intervals.}
+
+\item{seed}{Optional local bootstrap seed, restoring the caller's RNG.}
 }
 \value{
-A data frame with a model column followed by the evaluation columns.
+Without `reference`, a data frame of model evaluations. With it,
+  a data frame containing `model`, `reference`, `metric`, `time`, `estimate`,
+  `reference_estimate`, `difference`, `lower`, `upper`, `bootstrap_valid`,
+  `n`, `events`, `status`, and `message`. Limits concern the difference.
 }
 \description{
 Compare Models on the Same Held-Out Observations
 }
 \details{
 Metrics are evaluated on the identical rows and requested horizons.
-  This function does not fit models, rank incomparable raw risk scales, or
-  perform a statistical test of paired differences. Bootstrap intervals in
-  individual evaluations are conditional on the already fitted models.
+  Paired intervals resample independent assessment units with replacement,
+  using the same row indices for every model and metric. Predictions and the
+  censoring fit remain fixed. Intervals exclude training, tuning and G-fitting
+  uncertainty and are pointwise, not simultaneous. No fold-level t test or
+  p-value is returned. Do not pass pooled/repeated cross-validation rows or
+  repeated observations of the same unit as independent assessment units.
+  Positive differences favor the model for concordance/AUC; negative
+  differences favor it for Brier/IBS. Undefined replicates are counted.
+  IPCW comparisons require identical training outcomes or one explicit common
+  censoring_data/censoring_model. Risk scales themselves are never compared.
 }
 \examples{
 d <- survival::veteran

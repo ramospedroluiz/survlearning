@@ -10,6 +10,7 @@ reference:
     contents:
       - surv_fit
       - surv_tune
+      - surv_stack
       - surv_predict
   - title: Evaluate and validate
     contents:

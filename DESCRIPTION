@@ -1,7 +1,7 @@
 Package: survlearning
 Type: Package
 Title: Unified Statistical Learning for Survival and Reliability
-Version: 0.3.4
+Version: 0.3.5
 Authors@R: c(person("Pedro Luiz", "Ramos", email = "pedro.ramos@uc.cl",
     role = c("aut", "cre")),
     person("Hemant", "Ishwaran", role = "ctb", comment = "Included RF-SRC code"),
@@ -13,10 +13,15 @@ Description: Provides a small formula-based interface for fitting, tuning,
     predicting, and comparing statistical learning models for right-censored
     survival and reliability data. Provides censoring-aware evaluation,
     reusable stratified, grouped and temporal validation, and nested tuning.
+    Supports paired assessment intervals, censoring-weighted calibration
+    measures and cross-validated convex combinations of survival curves.
     Distinguishes risk scores, survival probabilities and median survival
     times. Includes reference models, forests, boosting and neural survival
     models through integrated engines, with training-only preprocessing and
-    explicit prediction capabilities.
+    explicit prediction capabilities. Methodological references include
+    Simon et al. (2011) <doi:10.18637/jss.v039.i05> for penalized Cox
+    regression and Ishwaran et al. (2008) <doi:10.1214/08-AOAS169> for
+    random survival forests.
 License: GPL (>= 3)
 URL: https://github.com/ramospedroluiz/survlearning
 BugReports: https://github.com/ramospedroluiz/survlearning/issues

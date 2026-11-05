@@ -74,6 +74,57 @@
 surv_evaluate <- function(object, newdata, metrics = "harrell", times = NULL,
     tau = NULL, censoring_data = NULL, min_g = 0.05, n_boot = 0L,
     conf_level = .95, seed = NULL, censoring_model = NULL) {
+  .integer_scalar(n_boot, "n_boot")
+  .validate_seed(seed)
+  .evaluation_fraction(conf_level, "conf_level")
+  prepared <- .evaluation_setup(object, newdata, metrics, times, tau,
+    censoring_data, min_g, censoring_model)
+  calculate <- prepared$calculate
+  n <- nrow(prepared$y)
+  out <- calculate(seq_len(n))
+  out$lower <- out$upper <- NA_real_
+  valid <- integer(nrow(out))
+  if (n_boot > 0L) {
+    boot <- .with_seed(seed, {
+      values <- matrix(NA_real_, nrow = n_boot, ncol = nrow(out))
+      for (b in seq_len(n_boot)) {
+        values[b, ] <- calculate(sample.int(n, n, replace = TRUE))$estimate
+      }
+      values
+    })
+    valid <- colSums(is.finite(boot))
+    for (j in seq_len(nrow(out))) {
+      if (!is.finite(out$estimate[j])) next
+      if (valid[j] >= 2L) {
+        ci <- stats::quantile(boot[is.finite(boot[, j]), j],
+          c((1 - conf_level) / 2, (1 + conf_level) / 2), names = FALSE)
+        out$lower[j] <- ci[1L]
+        out$upper[j] <- ci[2L]
+      }
+      if (valid[j] < n_boot || valid[j] < 2L) {
+        out$status[j] <- if (valid[j] < 2L) "insufficient_bootstrap" else "partial_bootstrap"
+        out$message[j] <- paste0(valid[j], "/", n_boot,
+          " finite bootstrap replicates; intervals require at least two.")
+      }
+    }
+  }
+  out$n <- n
+  out$events <- sum(prepared$y[, 2L])
+  out <- out[, c("metric", "time", "estimate", "lower", "upper", "n",
+    "events", "status", "message")]
+  row.names(out) <- NULL
+  class(out) <- c("survlearning_evaluation", "data.frame")
+  attr(out, "censoring") <- prepared$censoring
+  attr(out, "settings") <- list(metrics = metrics, times = times, tau = tau,
+    min_g = min_g, n_boot = n_boot, conf_level = conf_level, seed = seed,
+    bootstrap = "conditional test-case percentile; fixed event and censoring fits",
+    bootstrap_valid = valid, ibs_interval = if ("ibs" %in% metrics) range(times) else NULL)
+  attr(out, "assumptions") <- .evaluation_assumptions(prepared$conditional)
+  out
+}
+
+.evaluation_setup <- function(object, newdata, metrics = "harrell", times = NULL,
+    tau = NULL, censoring_data = NULL, min_g = .05, censoring_model = NULL) {
   object <- .evaluation_object(object)
   choices <- c("harrell", "uno", "auc", "brier", "ibs", "ipcw_c")
   if (!is.character(metrics) || !length(metrics) || anyNA(metrics) ||
@@ -81,9 +132,6 @@ surv_evaluate <- function(object, newdata, metrics = "harrell", times = NULL,
     stop("'metrics' must contain distinct names from: ", paste(choices, collapse = ", "),
       ".", call. = FALSE)
   }
-  .integer_scalar(n_boot, "n_boot")
-  .validate_seed(seed)
-  .evaluation_fraction(conf_level, "conf_level")
   .evaluation_fraction(min_g, "min_g", inclusive = TRUE)
   y <- .outcome(object$formula, newdata, require_event = FALSE)
   n <- nrow(y)
@@ -172,46 +220,8 @@ surv_evaluate <- function(object, newdata, metrics = "harrell", times = NULL,
     if (is.matrix(g_time)) g_time[index, , drop = FALSE] else g_time,
     pair_context = list(censoring = censoring, newdata = newdata[index, , drop = FALSE],
       conditional = conditional, min_g = min_g))
-  out <- calculate(seq_len(n))
-  out$lower <- out$upper <- NA_real_
-  valid <- integer(nrow(out))
-  if (n_boot > 0L) {
-    boot <- .with_seed(seed, {
-      values <- matrix(NA_real_, nrow = n_boot, ncol = nrow(out))
-      for (b in seq_len(n_boot)) {
-        values[b, ] <- calculate(sample.int(n, n, replace = TRUE))$estimate
-      }
-      values
-    })
-    valid <- colSums(is.finite(boot))
-    for (j in seq_len(nrow(out))) {
-      if (!is.finite(out$estimate[j])) next
-      if (valid[j] >= 2L) {
-        ci <- stats::quantile(boot[is.finite(boot[, j]), j],
-          c((1 - conf_level) / 2, (1 + conf_level) / 2), names = FALSE)
-        out$lower[j] <- ci[1L]
-        out$upper[j] <- ci[2L]
-      }
-      if (valid[j] < n_boot || valid[j] < 2L) {
-        out$status[j] <- if (valid[j] < 2L) "insufficient_bootstrap" else "partial_bootstrap"
-        out$message[j] <- paste0(valid[j], "/", n_boot,
-          " finite bootstrap replicates; intervals require at least two.")
-      }
-    }
-  }
-  out$n <- n
-  out$events <- sum(y[, 2L])
-  out <- out[, c("metric", "time", "estimate", "lower", "upper", "n",
-    "events", "status", "message")]
-  row.names(out) <- NULL
-  class(out) <- c("survlearning_evaluation", "data.frame")
-  attr(out, "censoring") <- censoring
-  attr(out, "settings") <- list(metrics = metrics, times = times, tau = tau,
-    min_g = min_g, n_boot = n_boot, conf_level = conf_level, seed = seed,
-    bootstrap = "conditional test-case percentile; fixed event and censoring fits",
-    bootstrap_valid = valid, ibs_interval = if ("ibs" %in% metrics) range(times) else NULL)
-  attr(out, "assumptions") <- .evaluation_assumptions(conditional)
-  out
+  list(calculate = calculate, y = y, risk = risk, probabilities = probabilities,
+    g_event = g_event, g_time = g_time, censoring = censoring, conditional = conditional)
 }
 
 .evaluation_object <- function(object) {
@@ -444,7 +454,7 @@ surv_evaluate <- function(object, newdata, metrics = "harrell", times = NULL,
   if (denominator > 0) numerator / denominator else NA_real_
 }
 
-#' Grouped Survival Calibration
+#' Survival Calibration Curves and IPCW Calibration Measures
 #'
 #' @param object A fitted or tuned survlearning object with native probabilities.
 #' @param newdata Evaluation data including outcomes and predictors.
@@ -458,6 +468,20 @@ surv_evaluate <- function(object, newdata, metrics = "harrell", times = NULL,
 #' @param conf_level Interval confidence level.
 #' @param seed NULL (default) uses the caller's RNG; an integer >= 0 supplies
 #'   a local bootstrap seed and restores the caller's RNG state.
+#' @param type `"groups"` (default) retains grouped calibration; `"metrics"`
+#'   estimates an IPCW logistic calibration intercept and slope at each horizon.
+#' @details With `type = "metrics"`, the target is failure by the horizon.
+#'   The intercept uses logit(predicted failure) as an offset with slope fixed
+#'   at one. The slope comes from a separate joint intercept/slope fit. Their
+#'   ideal values are zero and one, respectively. Cases receive 1/G(T-),
+#'   controls 1/G(t), and earlier censorings zero weight. Default G uses training
+#'   outcomes, never evaluation outcomes. An explicit conditional G is allowed.
+#'   Quasibinomial IRLS gives the weighted logistic point estimates; model-based
+#'   GLM standard errors are not used. Optional percentile intervals resample
+#'   assessment units, keeping event/G fits fixed. They exclude training and
+#'   selection uncertainty and are pointwise. Exact boundary probabilities,
+#'   separation, constant scores and insufficient support are diagnosed, not
+#'   silently clipped or replaced. This is evaluation, not model recalibration.
 #' @details Groups are formed separately at each horizon using empirical
 #'   midrank quantile bins in predicted survival. Identical probabilities are
 #'   never split; fewer than
@@ -474,6 +498,9 @@ surv_evaluate <- function(object, newdata, metrics = "harrell", times = NULL,
 #'   support and reference transportability are required. Bootstrap intervals
 #'   exclude event/G fitting and group-selection uncertainty. Risk scores are not converted
 #'   to fake probabilities. Training-data calibration is resubstitution.
+#' @return With `type = "metrics"`, a data frame with metric, time, estimate,
+#'   ideal, lower, upper, n, known outcomes, events by horizon, effective_n,
+#'   bootstrap_valid, status and message. Undefined estimates/intervals are NA.
 #' @return A `survlearning_calibration` data.frame with `time`, `group`,
 #'   `predicted` (mean predicted survival), `observed` (KM survival without a
 #'   censoring model, normalized IPCW survival otherwise), `lower`,
@@ -489,7 +516,8 @@ surv_evaluate <- function(object, newdata, metrics = "harrell", times = NULL,
 #' calibration <- surv_calibrate(fit, survival::veteran, times = 30, groups = 3)
 #' plot(calibration)
 surv_calibrate <- function(object, newdata, times, groups = 5L,
-    censoring_model = NULL, min_g = .05, n_boot = 0L, conf_level = .95, seed = NULL) {
+    censoring_model = NULL, min_g = .05, n_boot = 0L, conf_level = .95, seed = NULL,
+    type = "groups") {
   object <- .evaluation_object(object)
   .evaluation_times(times)
   .integer_scalar(groups, "groups", 1L)
@@ -498,6 +526,9 @@ surv_calibrate <- function(object, newdata, times, groups = 5L,
   .integer_scalar(n_boot, "n_boot")
   .validate_seed(seed)
   if (n_boot == 1L) stop("Use n_boot = 0 or at least two bootstrap repetitions.", call. = FALSE)
+  type <- match.arg(type, c("groups", "metrics"))
+  if (type == "metrics") return(.calibration_metrics(object, newdata, times,
+    censoring_model, min_g, n_boot, conf_level, seed))
   y <- .outcome(object$formula, newdata, require_event = FALSE)
   .evaluation_followup(times, max(y[, 1L]), "evaluation")
   p <- .evaluation_probabilities(object, newdata, times)

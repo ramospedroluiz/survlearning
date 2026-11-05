@@ -112,7 +112,7 @@
   feasible <- violation <= max(1e-6, params$tolerance * 100 * max(y[, 1L])) &&
     dual_violation <= max(1e-6, params$tolerance * 100 * n) && relative_gap <= 1e-5
   if (!feasible) stop("Censored SVM failed the independent primal/dual certificate.", call. = FALSE)
-  structure(list(formulation = "censored_primal", coefficients = coefficients,
+  fit <- structure(list(formulation = "censored_primal", coefficients = coefficients,
     knots = problem$design$knots, kernel = params$kernel,
     sv = matrix(numeric(), 0L, ncol(x), dimnames = list(NULL, colnames(x))),
     response_center = problem$center,
@@ -131,6 +131,16 @@
       solver_and_reconstruction_seconds = unname(proc.time()[["elapsed"]] - start),
       solver_version = as.character(utils::packageVersion(params$solver))),
     dual = cdual), class = "survlearning_svm")
+  training_scores <- .svm_primal_predict(fit, x)
+  fit$diagnostics$distinct_training_scores <- length(unique(training_scores))
+  fit$diagnostics$training_score_range <- diff(range(training_scores))
+  fit$diagnostics$constant_prediction <- fit$diagnostics$distinct_training_scores == 1L
+  if (fit$diagnostics$constant_prediction) {
+    warning("Censored SVM converged to constant training scores: no risk discrimination was learned. ",
+      "This can be a genuine optimum under heavy censoring or weak signal. ",
+      "Inspect validation and consider svm_rank or svm_hybrid explicitly; the objective was not changed.", call. = FALSE)
+  }
+  fit
 }
 
 .svm_primal_predict <- function(object, x, raw = FALSE) {

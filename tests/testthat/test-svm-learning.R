@@ -292,7 +292,8 @@ test_that("ranking can distinguish failure rates under 97.5 percent administrati
     event = c(rep(1, 10), rep(0, 990), rep(1, 40), rep(0, 960)))
   d$time <- ifelse(d$event == 1, 1, 10)
   formula <- survival::Surv(time, event) ~ x
-  regression <- surv_fit(formula, d, "svm", list(cost = 0.1))
+  expect_warning(regression <- surv_fit(formula, d, "svm", list(cost = 0.1)),
+    "constant training scores")
   ranking <- surv_fit(formula, d, "svm_rank", list(lambda = 0.01))
   expect_equal(length(unique(surv_predict(regression, d))), 1L)
   expect_gt(surv_predict(ranking, data.frame(x = 1)), surv_predict(ranking, data.frame(x = 0)))

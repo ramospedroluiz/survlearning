@@ -35,7 +35,8 @@ summary.survlearning_fit <- function(object, conf_level = .95, ...) {
   structure(list(method = object$method, engine = object$engine_package,
     n = object$n, events = object$events,
     censoring_percent = 100 * (1 - object$events / object$n),
-    predictions = .method_specs()[[object$method]]$predictions,
+    predictions = if (inherits(object, "survlearning_stack")) c("risk", "survival") else
+      .method_specs()[[object$method]]$predictions,
     params = object$params, seconds = object$fit_seconds,
     warnings = object$diagnostics$warnings,
     convergence = object$diagnostics$convergence,

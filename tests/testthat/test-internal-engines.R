@@ -1,5 +1,11 @@
 test_that("integrated RSF agrees with upstream with tied times and factors", {
   skip_if_not_installed("randomForestSRC")
+  # Match the seed protocol of the integrated RF-SRC 3.9.0 engine.
+  if ("rfsrc.RNGversion" %in% getNamespaceExports("randomForestSRC")) {
+    rng_version <- getExportedValue("randomForestSRC", "rfsrc.RNGversion")
+    previous_rng <- rng_version("3.2.3")
+    withr::defer(rng_version(previous_rng))
+  }
   d <- example_data(80L)
   d$time <- pmax(.1, round(d$time, 1))
   for (threads in c(1L, 2L)) {
@@ -58,6 +64,7 @@ test_that("internal Royston-Parmar fits match the independent reference", {
   for (scale in c("hazard", "odds", "normal")) for (knots in 0:1) {
     fit <- surv_fit(Surv(time, event) ~ x + z, d, "flexsurv", list(knots = knots, scale = scale))
     p <- survlearning:::.prepare_design(fit$formula, d)
+    p$x <- survlearning:::.scaled_design(p$x, fit$engine$predictor_scaling)
     old <- flexsurv::flexsurvspline(Surv(.sl_time, .sl_event) ~ .,
       survlearning:::.engine_data(p$x, p$y), k = knots, scale = scale,
       inits = fit$engine$initial, hessian = FALSE)
@@ -66,6 +73,7 @@ test_that("internal Royston-Parmar fits match the independent reference", {
     expect_equal(unname(surv_predict(fit, d[1:3, ], "survival", c(0, 2, 5))), unname(expected), tolerance = 1e-5)
     expect_equal(fit$engine$loglik, old$loglik, tolerance = 1e-6)
     legacy <- fit
+    old$predictor_scaling <- fit$engine$predictor_scaling
     legacy$engine <- old
     expect_equal(surv_predict(legacy, d[1:3, ], "survival", c(0, 2, 5)),
       surv_predict(fit, d[1:3, ], "survival", c(0, 2, 5)), tolerance = 1e-5)

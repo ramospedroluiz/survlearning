@@ -2,7 +2,7 @@
 % Please edit documentation in R/evaluate.R
 \name{surv_calibrate}
 \alias{surv_calibrate}
-\title{Grouped Survival Calibration}
+\title{Survival Calibration Curves and IPCW Calibration Measures}
 \usage{
 surv_calibrate(
   object,
@@ -13,7 +13,8 @@ surv_calibrate(
   min_g = 0.05,
   n_boot = 0L,
   conf_level = 0.95,
-  seed = NULL
+  seed = NULL,
+  type = "groups"
 )
 }
 \arguments{
@@ -37,8 +38,15 @@ reports point estimates only. The event/G fits and original groups stay fixed.}
 
 \item{seed}{NULL (default) uses the caller's RNG; an integer >= 0 supplies
 a local bootstrap seed and restores the caller's RNG state.}
+
+\item{type}{`"groups"` (default) retains grouped calibration; `"metrics"`
+estimates an IPCW logistic calibration intercept and slope at each horizon.}
 }
 \value{
+With `type = "metrics"`, a data frame with metric, time, estimate,
+  ideal, lower, upper, n, known outcomes, events by horizon, effective_n,
+  bootstrap_valid, status and message. Undefined estimates/intervals are NA.
+
 A `survlearning_calibration` data.frame with `time`, `group`,
   `predicted` (mean predicted survival), `observed` (KM survival without a
   censoring model, normalized IPCW survival otherwise), `lower`,
@@ -50,9 +58,22 @@ A `survlearning_calibration` data.frame with `time`, `group`,
   at `conf_level`, or NA when `n_boot = 0` or bootstrap support is inadequate.
 }
 \description{
-Grouped Survival Calibration
+Survival Calibration Curves and IPCW Calibration Measures
 }
 \details{
+With `type = "metrics"`, the target is failure by the horizon.
+  The intercept uses logit(predicted failure) as an offset with slope fixed
+  at one. The slope comes from a separate joint intercept/slope fit. Their
+  ideal values are zero and one, respectively. Cases receive 1/G(T-),
+  controls 1/G(t), and earlier censorings zero weight. Default G uses training
+  outcomes, never evaluation outcomes. An explicit conditional G is allowed.
+  Quasibinomial IRLS gives the weighted logistic point estimates; model-based
+  GLM standard errors are not used. Optional percentile intervals resample
+  assessment units, keeping event/G fits fixed. They exclude training and
+  selection uncertainty and are pointwise. Exact boundary probabilities,
+  separation, constant scores and insufficient support are diagnosed, not
+  silently clipped or replaced. This is evaluation, not model recalibration.
+
 Groups are formed separately at each horizon using empirical
   midrank quantile bins in predicted survival. Identical probabilities are
   never split; fewer than

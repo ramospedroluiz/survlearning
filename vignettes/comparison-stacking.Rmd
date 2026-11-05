@@ -1,0 +1,117 @@
+---
+title: "Paired comparison, calibration and survival stacking"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Paired comparison, calibration and survival stacking}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+library(survlearning)
+```
+
+## Keep an independent assessment sample
+
+These functions use the existing fitting and prediction interface. No new
+modeling dependency or neural runtime is required. Here the independent
+censoring mechanism is known because the observations are generated.
+
+```{r data}
+set.seed(42)
+x <- rnorm(400)
+z <- rnorm(400)
+failure <- exp(2 - .4 * x + .2 * z + rnorm(400, sd = .8))
+censor <- rexp(400, .035)
+d <- data.frame(time = pmin(failure, censor),
+  event = as.integer(failure <= censor), x, z)
+train <- d[1:240, ]
+test <- d[241:400, ]
+f <- Surv(time, event) ~ x + z
+cox <- surv_fit(f, train, "cox")
+aft <- surv_fit(f, train, "aft", params = list(distribution = "lognormal"))
+```
+
+## Paired uncertainty
+
+The difference is always model minus reference. A positive concordance
+difference favors the model; a negative Brier difference favors the model.
+The same assessment units are resampled for every model. This preserves
+pairing, unlike comparing two separate confidence intervals.
+
+```{r paired}
+surv_compare(list(cox = cox, aft = aft), test,
+  reference = "cox", n_boot = 100, seed = 9)
+```
+
+The percentile interval conditions on the event models, selected settings,
+and censoring fit. It does not include refitting uncertainty. It is pointwise,
+not simultaneous across models, metrics or horizons. Use more repetitions
+for final analyses. Repeated CV rows are not independent test units and must
+not be passed to this test-case bootstrap. The existing `surv_validate()`
+reports descriptive differences across paired folds, not these intervals.
+
+For IPCW metrics, the comparison uses one common reference distribution.
+If the models have different training outcomes, supply `censoring_data` or
+`censoring_model` explicitly. Undefined bootstrap estimates are counted in
+`bootstrap_valid` and are not replaced by zero.
+
+## Calibration at a horizon
+
+```{r calibration}
+surv_calibrate(aft, test, times = 5, type = "metrics",
+  n_boot = 100, seed = 9)
+```
+
+For failure probability $p_i(t)=1-\widehat S(t\mid x_i)$, the intercept fit
+uses $\operatorname{logit}\Pr(T_i\leq t)=a+\operatorname{logit}p_i(t)$.
+The slope comes from the separate fit
+$\operatorname{logit}\Pr(T_i\leq t)=a+b\operatorname{logit}p_i(t)$.
+The ideal intercept and slope are zero and one. The fits use cases weighted
+by $1/\widehat G(Y_i-)$ and controls by $1/\widehat G(t)$, with zero weight
+for earlier censorings. They therefore require independent censoring for
+marginal G, or suitable conditional assumptions for a supplied G model.
+G is estimated on training/reference observations, never these test outcomes.
+
+Exact zero/one probabilities, separation, constant logits and sparse events
+are diagnosed. The procedure does not clip probabilities or recalibrate the
+prediction model. Bootstrap intervals resample test units with event/G fits
+fixed. The grouped calibration plot remains the default `type = "groups"`.
+
+## Combine survival curves
+
+```{r stack}
+stack <- surv_stack(f, train, methods = c("cox", "aft"),
+  params = list(aft = list(distribution = "lognormal")),
+  times = c(3, 5, 8), folds = 3, seed = 9)
+stack$weights
+surv_predict(stack, test[1:2, ], "survival", times = c(3, 5, 8))
+surv_compare(list(cox = cox, aft = aft, stack = stack), test,
+  metrics = c("harrell", "brier"), times = 5)
+```
+
+Each training observation receives survival predictions from models fitted
+without that observation. Preprocessing and G estimation are repeated in
+each fold. If `grids` are supplied, their Harrell-C tuning is performed on
+inner folds of that training sample. The final base models are fitted on
+all training observations.
+
+The weights minimize average out-of-fold IPCW Brier loss over the explicit
+horizons, subject to $w_m\geq0$ and $\sum_m w_m=1$. The resulting curve is
+$\widehat S_{stack}(t\mid x)=\sum_m w_m\widehat S_m(t\mid x)$.
+The weights do not vary with time, so probability bounds and nonincreasing
+curves are preserved. They are not variable-importance measures and can be
+nonunique when component curves agree. A convex solver and an independent
+first-order bound check numerical optimality.
+
+The OOF objective chooses weights; it is not an independent performance
+estimate of the combined model. Evaluate the entire procedure on a separate
+test sample or inside an outer validation loop. Stacking currently accepts
+one complete stratified partition, not grouped or temporal folds. Risk-only
+models, including the SVM objectives, cannot be mixed with survival curves.
+Failures or unsupported censoring horizons stop fitting; no learner or row
+is silently removed. Risk prediction is negative restricted mean, integrated
+over zero plus the declared grid. It is not a Cox log hazard or a lifetime
+median. Supported reliability summaries remain available through
+`surv_reliability()`.

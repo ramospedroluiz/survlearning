@@ -11,6 +11,9 @@
     min_child_weight = params$min_child_weight, reg_lambda = params$leaf_penalty,
     nthread = params$threads, seed = seed, verbosity = 0L)
   if (method == "xgboost_aft") {
+    # A training-only log-location initialization shifts with the time unit.
+    # A fixed base_score would spend boosting iterations undoing that unit.
+    settings$base_score <- exp(mean(log(y[, 1L])))
     settings$aft_loss_distribution <- params$distribution
     settings$aft_loss_distribution_scale <- params$scale
   }

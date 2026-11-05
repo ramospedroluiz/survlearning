@@ -26,7 +26,7 @@ Torch nor Python. The package is not yet on CRAN.
 For a downloaded source archive, use an installer that resolves dependencies:
 
 ```r
-remotes::install_local("survlearning_0.3.4.tar.gz", dependencies = NA)
+remotes::install_local("survlearning_0.3.5.tar.gz", dependencies = NA)
 ```
 
 Base R's `install.packages(..., repos = NULL)` installs a local archive but does
@@ -92,7 +92,7 @@ Workers duplicate data and may increase memory requirements.
 
 ## Survival SVM objectives
 
-Version 0.3.4 includes `svm_rank`, `svm_hybrid`, and `svm_ipcw`. The original
+The package includes `svm_rank`, `svm_hybrid`, and `svm_ipcw`. The original
 `svm` identifier retains censored absolute-loss regression. Each new objective
 supports linear and exact additive kernels, without subsampling, Python,
 Torch or new dependencies. Ranking uses all strictly time-ordered comparable
@@ -136,6 +136,35 @@ weights are diagnosed. `uno` uses marginal weights; `ipcw_c` supports conditiona
 ordered-pair concordance. Probability metrics require a method with survival
 predictions. Bootstrap intervals condition on the fitted models and do not
 include refitting or tuning uncertainty.
+
+## Compare and combine models
+
+```r
+cox <- surv_fit(f, train, "cox")
+surv_compare(list(cox = cox, aft = fit), test,
+  reference = "cox", n_boot = 500, seed = 14)
+surv_calibrate(fit, test, times = 60, type = "metrics",
+  n_boot = 500, seed = 14)
+
+stack <- surv_stack(f, train, methods = c("cox", "aft"),
+  times = c(30, 60, 90), folds = 3, seed = 14)
+stack$weights
+surv_predict(stack, new_items, "survival", times = c(30, 60, 90))
+```
+
+Paired differences are model minus reference. Their intervals use the same
+test-case resamples for all models and condition on the fitted event and
+censoring models. Calibration intercept and slope have ideal values zero
+and one; both account for censoring. Boundary probabilities or separation
+can make these measures undefined and are reported explicitly.
+
+Stacking combines survival curves, not arbitrary risk scores. Weights are
+nonnegative, sum to one and remain fixed over time. They minimize OOF IPCW
+Brier loss; supplied base-model grids are tuned inside each OOF training
+sample. Final models use all training rows. The loss used to select weights
+is not an independent performance estimate. Use a separate test sample.
+These features are available in the local 0.3.5 source archive; the public
+GitHub branch is unchanged until that version is published.
 
 ## Interpretation and reliability
 

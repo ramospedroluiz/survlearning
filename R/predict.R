@@ -37,6 +37,10 @@
 #' all rows and constant zero risk. PLANN survival is a step function on its
 #' training interval endpoints; its risk is negative restricted mean on that
 #' same grid. Neural Cox returns log hazard with a training-only baseline.
+#' Predictions are checked for finite values, valid probability bounds and
+#' nonincreasing survival over the requested supported horizons. An invalid
+#' curve raises an error rather than being silently clipped or repaired.
+#' Fits whose optimizer explicitly reported failure cannot be used for prediction.
 #' @return Risk and time predictions are numeric vectors. Survival predictions
 #'   are matrices with one row per observation and one column per requested
 #'   horizon, in the requested order.
@@ -52,10 +56,15 @@
 #' surv_predict(fit, survival::veteran[1:3, ], type = "survival", times = c(30, 90))
 surv_predict <- function(object, newdata, type = "risk", times = NULL) {
   if (inherits(object, "survlearning_tune")) object <- object$best_model
+  if (inherits(object, "survlearning_stack")) return(.stack_predict(object, newdata, type, times))
   if (!inherits(object, "survlearning_fit")) {
     stop("'object' must come from surv_fit() or surv_tune().", call. = FALSE)
   }
   .require_engine(object$method)
+  if (identical(object$diagnostics$convergence$status, "reported_failure")) {
+    stop("Cannot predict from a model whose optimizer reported failure. ",
+      "Inspect surv_diagnostics() and refit the model.", call. = FALSE)
+  }
   type <- match.arg(type, c("risk", "survival", "time"))
   if (!type %in% .method_specs()[[object$method]]$predictions) {
     stop("Method '", object$method, "' does not provide native '", type,
@@ -80,18 +89,21 @@ surv_predict <- function(object, newdata, type = "risk", times = NULL) {
       result[, times > object$max_time] <- NA_real_
       warning("Horizons beyond training follow-up return NA; no tail extrapolation was added.", call. = FALSE)
     }
+    .validate_survival_prediction(result, nrow(x), times, object)
     colnames(result) <- paste0("t=", format(times, trim = TRUE))
     return(result)
   }
   if (object$method %in% names(.reference_specs())) {
-    return(as.numeric(.predict_reference(object, x, type, times)))
+    return(.validate_vector_prediction(.predict_reference(object, x, type, times), nrow(x), type))
   }
   if (type == "time") {
-    if (object$method == "xgboost_aft") return(.xgboost_median(object, x))
-    return(as.numeric(stats::predict(object$engine, newdata = .engine_data(x),
-      type = "quantile", p = 0.5)))
+    result <- if (object$method == "xgboost_aft") .xgboost_median(object, x) else
+      stats::predict(object$engine, newdata = .engine_data(x), type = "quantile", p = 0.5)
+    return(.validate_vector_prediction(result, nrow(x), type))
   }
-  if (object$method %in% .svm_learning_methods()) return(.svm_learning_predict(object$engine, x))
+  if (object$method %in% .svm_learning_methods()) {
+    return(.validate_vector_prediction(.svm_learning_predict(object$engine, x), nrow(x), type))
+  }
   result <- switch(object$method,
     aft = -stats::predict(object$engine, newdata = .engine_data(x), type = "lp"),
     aft_lasso = , aft_ridge = , aft_elasticnet = {
@@ -110,7 +122,36 @@ surv_predict <- function(object, newdata, type = "risk", times = NULL) {
     mtlr = .mtlr_risk(object, x),
     svm = -stats::predict(object$engine, newdata = .engine_data(x))$predicted
   )
+  .validate_vector_prediction(result, nrow(x), type)
+}
+
+.validate_vector_prediction <- function(result, n, type) {
+  if (!is.numeric(result) || length(result) != n || any(!is.finite(result)) ||
+      (type == "time" && any(result <= 0))) {
+    stop("Model returned invalid or non-finite ", type, " predictions. ",
+      "Check fit identifiability, convergence and the prediction range; no values were replaced.", call. = FALSE)
+  }
   as.numeric(result)
+}
+
+.validate_survival_prediction <- function(result, n, times, object) {
+  if (!is.matrix(result) || !is.numeric(result) || !identical(dim(result), c(n, length(times)))) {
+    stop("Model returned an invalid survival matrix shape.", call. = FALSE)
+  }
+  supported <- object$method %in% c("aft", "xgboost_aft", "flexsurv") | times <= object$max_time
+  values <- result[, supported, drop = FALSE]
+  if (any(!is.finite(values)) || any(values < 0 | values > 1)) {
+    stop("Model returned non-finite or out-of-range survival probabilities within prediction support.", call. = FALSE)
+  }
+  ordered <- which(supported)[order(times[supported])]
+  if (length(ordered) > 1L && any(result[, ordered[-1L], drop = FALSE] -
+      result[, ordered[-length(ordered)], drop = FALSE] > 1e-8)) {
+    stop("Model returned nonmonotone survival probabilities; no curve was clipped or reordered.", call. = FALSE)
+  }
+  if (any(abs(result[, times == 0, drop = FALSE] - 1) > 1e-8)) {
+    stop("Model returned invalid survival probabilities at time zero.", call. = FALSE)
+  }
+  invisible(NULL)
 }
 
 #' @rdname surv_predict

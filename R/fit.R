@@ -42,6 +42,10 @@
 #' prediction_tolerance times the maximum training follow-up, preventing
 #' solver-scale near ties from producing artificial risk ordering. Set this
 #' parameter to zero to inspect raw scores; it does not change fitting.
+#' A constant training score is reported explicitly in diagnostics and a warning.
+#' This can be a valid optimum of censored absolute loss, not a solver failure;
+#' it provides no learned risk discrimination. No alternative objective is selected
+#' automatically. Ranking and hybrid methods remain explicit choices.
 #' `collapse_duplicates` is accepted for compatibility and has no effect:
 #' all observations have individual loss constraints. Cost must be tuned
 #' separately for each kernel, without using test outcomes. SVM scores are
@@ -105,7 +109,7 @@
 #'
 #' Factors are encoded consistently with training. Numeric design columns
 #' are standardized using training means and standard deviations for SVM
-#' penalized AFT, and MTLR. Other engines receive the unscaled design; glmnet
+#' penalized AFT, MTLR, and Royston-Parmar. Other engines receive the unscaled design; glmnet
 #' performs its own training-only standardization.
 #' Penalized Cox follows a descending regularization path ending at the exact
 #' requested lambda, rather than fitting a weak-penalty cold start in isolation.
@@ -120,6 +124,10 @@
 #' predictors; `cox_spline` uses `df` (3) for natural splines of continuous
 #' design columns; `flexsurv` uses `knots` (1) and `scale` (`"hazard"`,
 #' `"odds"` or `"normal"`); `coxboost` uses `steps` (100) and `penalty` (100).
+#' Royston-Parmar stores its optimizer coefficients in training-standardized
+#' coordinates together with their transformation. CoxBoost uses a zero-effect
+#' auxiliary column for single-predictor designs to initialize the upstream
+#' scalar penalty correctly; the fitted method and observations are unchanged.
 #' `ranger` uses `trees` (200), `mtry` (square root of predictor count),
 #' `min_node` (15) and `threads` (1). `aorsf` uses the same forest arguments
 #' with `min_node` (5) and `splits` (5), specifying oblique rather than axis
@@ -144,7 +152,10 @@
 #' information, rather than inventing survival until the next grid endpoint.
 #' XGBoost Cox uses signed time labels for censoring and an explicitly
 #' estimated training-only Breslow baseline. XGBoost AFT uses lower/upper
-#' censoring bounds, not ordinary regression on censored times. MTLR knots
+#' censoring bounds, not ordinary regression on censored times. Its initial
+#' log-location is the training mean log-follow-up, so initialization respects
+#' changes in the outcome time unit. This is a starting value, not an estimate
+#' of mean lifetime. MTLR knots
 #' and scaling are learned within training, including each tuning fold.
 #' @return A `survlearning_fit` object with engine, parameters, design, and
 #'   training metadata. Access the engine via `$engine`. Neural adapters store
@@ -157,6 +168,11 @@
 #'   Kaplan-Meier accepts fully censored training outcomes and returns survival
 #'   one within observed support; regression engines require an observed failure.
 #'   Invalid inputs or unavailable required dependencies cause informative errors.
+#'   Unpenalized AFT rejects rank-deficient designs and reported nonconvergence,
+#'   rather than returning unidentified coefficients. Royston-Parmar checks
+#'   the baseline spline's slope throughout its domain, including between knots.
+#'   An invalid fitted distribution is rejected; curves are never repaired by
+#'   clipping or by silently reducing the number of knots.
 #'   No files are written and no dependencies are installed automatically.
 #' @export
 #' @examples
@@ -240,7 +256,7 @@ surv_fit <- function(formula, data, method = "cox", params = list(), seed = NULL
   formula <- .engine_formula()
   if (method %in% .svm_learning_methods()) return(.svm_learning_fit(method, x, y, params, svm_cache))
   switch(method,
-    aft = survival::survreg(formula, data = data, dist = params$distribution),
+    aft = .fit_aft(x, y, params),
     aft_lasso = , aft_ridge = , aft_elasticnet = {
       .fit_gehan(x, y, params,
         if (method == "aft_elasticnet") params$alpha else as.integer(method == "aft_lasso"))
@@ -268,6 +284,31 @@ surv_fit <- function(formula, data, method = "cox", params = list(), seed = NULL
       maxit = params$max_iter, threshold = params$tolerance),
     svm = .svm_fit(x, y, params, svm_cache)
   )
+}
+
+.fit_aft <- function(x, y, params) {
+  moments <- .design_moments(x)
+  rank_design <- cbind(1, .scaled_design(x, moments))
+  if (qr(rank_design)$rank < ncol(rank_design)) {
+    stop("Unpenalized AFT requires an identifiable, full-rank design. ",
+      "Remove redundant predictors explicitly or choose a penalized AFT method; ",
+      "no columns or observations were removed.", call. = FALSE)
+  }
+  failed <- FALSE
+  fit <- withCallingHandlers(survival::survreg(.engine_formula(),
+    data = .engine_data(x, y), dist = params$distribution), warning = function(w) {
+      if (grepl("did not converge|iteration", conditionMessage(w), ignore.case = TRUE)) failed <<- TRUE
+    })
+  if (failed || !is.null(fit$fail)) {
+    stop("AFT optimization did not converge. No fitted model was returned; ",
+      "check event information, predictor scaling and model identifiability.", call. = FALSE)
+  }
+  if (any(!is.finite(stats::coef(fit))) || length(fit$scale) != 1L ||
+      !is.finite(fit$scale) || fit$scale <= 0) {
+    stop("AFT returned unidentified coefficients or an invalid scale. ",
+      "No fitted model was returned.", call. = FALSE)
+  }
+  fit
 }
 
 .engine_convergence <- function(engine) {

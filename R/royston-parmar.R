@@ -94,6 +94,10 @@
 }
 
 .fit_rp <- function(x, y, params) {
+  if (qr(cbind(1, x))$rank < ncol(x) + 1L) {
+    stop("Royston-Parmar requires an identifiable, full-rank predictor design; ",
+      "no columns or observations were removed.", call. = FALSE)
+  }
   time <- y[, 1L]
   event <- y[, 2L]
   deaths <- log(time[event == 1])
@@ -124,19 +128,30 @@
       1, rep(0, length(knots) - 2L + ncol(x)))
     initialization <- "feasible_intercept"
   }
-  # Match the upstream numerical-gradient path for the normal scale.
-  gradient <- if (params$scale == "normal") NULL else problem$gradient
-  fit <- stats::optim(initial, problem$value, gradient, method = "BFGS", hessian = TRUE)
+  fit <- tryCatch(stats::optim(initial, problem$value, problem$gradient,
+    method = "BFGS", hessian = TRUE), error = function(e) {
+      stop("Royston-Parmar optimization failed: ", conditionMessage(e),
+        ". Check event information and the requested number of knots.", call. = FALSE)
+    })
   names(fit$par) <- c(paste0("gamma", seq_along(knots) - 1L), colnames(x))
   if (!is.finite(fit$value)) stop("Royston-Parmar returned a non-finite likelihood.", call. = FALSE)
-  if (fit$convergence != 0L) warning("Royston-Parmar optimizer did not report convergence.", call. = FALSE)
+  if (fit$convergence != 0L) stop("Royston-Parmar optimizer did not report convergence; ",
+    "no fitted model was returned.", call. = FALSE)
+  minimum_slope <- .rp_minimum_slope(fit$par[seq_along(knots)], knots)
+  if (!is.finite(minimum_slope) || minimum_slope <= 0) {
+    stop("Royston-Parmar fitted an invalid nonmonotone baseline. ",
+      "Request fewer knots or reconsider the model; no curve was clipped and no knots were removed.", call. = FALSE)
+  }
+  if (any(!is.finite(fit$hessian))) stop("Royston-Parmar observed information is non-finite; ",
+    "the fitted model cannot be verified.", call. = FALSE)
   information_eigenvalues <- eigen(fit$hessian, symmetric = TRUE, only.values = TRUE)$values
   information_ok <- min(information_eigenvalues) >
     sqrt(.Machine$double.eps) * max(abs(information_eigenvalues))
   structure(list(coefficients = fit$par, knots = knots, scale = params$scale,
     loglik = -fit$value, opt = fit, initial = initial,
     gradient = problem$gradient(fit$par), diagnostics = list(initialization = initialization,
-      initialization_errors = initial_errors, information_well_conditioned = information_ok,
+      initialization_errors = initial_errors, minimum_baseline_slope = minimum_slope,
+      information_well_conditioned = information_ok,
       information_eigenvalues = information_eigenvalues)), class = "survlearning_rp")
 }
 
@@ -144,10 +159,36 @@
   if (inherits(fit, "survlearning_rp")) fit$coefficients else fit$res[, "est"]
 }
 
+.rp_minimum_slope <- function(gamma, knots) {
+  # The derivative is quadratic on each knot interval and constant in both
+  # tails. Its minima occur at endpoints or an interior quadratic vertex.
+  slope <- function(z) drop(.rp_basis(z, knots, TRUE) %*% gamma)
+  edge <- slope(knots)
+  middle <- slope((utils::head(knots, -1L) + utils::tail(knots, -1L)) / 2)
+  left <- utils::head(edge, -1L); right <- utils::tail(edge, -1L)
+  a <- 2 * (left + right - 2 * middle)
+  b <- right - left - a
+  u <- rep(NA_real_, length(a))
+  positive <- which(a > 0 & is.finite(a))
+  u[positive] <- -b[positive] / (2 * a[positive])
+  inside <- which(is.finite(u) & u > 0 & u < 1)
+  if (!length(inside)) return(min(edge))
+  min(c(edge, slope(utils::head(knots, -1L)[inside] + diff(knots)[inside] * u[inside])))
+}
+
+.rp_risk <- function(fit, x) {
+  if (!is.null(fit$predictor_scaling)) x <- .scaled_design(x, fit$predictor_scaling)
+  drop(x %*% .rp_coefficients(fit)[colnames(x)])
+}
+
 .rp_survival <- function(fit, x, times) {
   coefficients <- .rp_coefficients(fit)
   gamma <- coefficients[paste0("gamma", seq_along(fit$knots) - 1L)]
-  risk <- drop(x %*% coefficients[colnames(x)])
+  minimum_slope <- .rp_minimum_slope(gamma, fit$knots)
+  if (!is.finite(minimum_slope) || minimum_slope <= 0) {
+    stop("Saved Royston-Parmar fit has an invalid nonmonotone baseline; refit the model.", call. = FALSE)
+  }
+  risk <- .rp_risk(fit, x)
   out <- matrix(1, nrow(x), length(times))
   positive <- times > 0
   if (any(positive)) {
